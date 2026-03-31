@@ -603,7 +603,8 @@ async function tratarBaseDisparo() {
 
   try {
     const p = await readExcelFile(state.baseFile);
-    state.baseRows = mapearColunasComSinonimos(p.rows, [
+    const rowsLimpas = limparColunasLixo(p.rows);
+    state.baseRows = mapearColunasComSinonimos(rowsLimpas, [
       { canonica: "Telefone", obrigatoria: true, padroes: ["telefone","fone","celular","whatsapp","contato"] },
     ], "base do disparo");
 
@@ -961,6 +962,31 @@ function _xlsxComColunaTexto(rows, colsTexto = []) {
   return ws;
 }
 
+/**
+ * Remove colunas __EMPTY* (cabeçalhos vazios do xlsx.js) e elimina
+ * colunas duplicadas case-insensitive, mantendo a primeira ocorrência.
+ */
+function limparColunasLixo(rows) {
+  if (!rows.length) return rows;
+
+  // Descobre quais chaves manter: sem __EMPTY e sem duplicatas case-insensitive
+  const todasChaves = Object.keys(rows[0]);
+  const vistasCi   = new Set();
+  const chavesOk   = todasChaves.filter(k => {
+    if (k.startsWith('__EMPTY')) return false;
+    const ci = k.toLowerCase();
+    if (vistasCi.has(ci)) return false;
+    vistasCi.add(ci);
+    return true;
+  });
+
+  return rows.map(row => {
+    const clean = {};
+    for (const k of chavesOk) clean[k] = row[k] ?? '';
+    return clean;
+  });
+}
+
 /** Normaliza chave de coluna: minúsculo, sem acento, sem espaços extras */
 function _chaveNorm(k) {
   return String(k)
@@ -1262,7 +1288,8 @@ function renderTabela(tableId, rows) {
     return;
   }
 
-  const headers = Object.keys(rows[0]);
+  // Remove colunas __EMPTY* (cabeçalhos vazios gerados pelo xlsx.js)
+  const headers = Object.keys(rows[0]).filter(h => !h.startsWith('__EMPTY'));
   const headTr  = document.createElement("tr");
   headers.forEach(h => { const th = document.createElement("th"); th.textContent = h; headTr.appendChild(th); });
   thead.appendChild(headTr);
