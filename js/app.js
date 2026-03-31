@@ -579,6 +579,18 @@ async function tratarBaseDisparo() {
     state.baseOutputFileName  = `${nome} tratada.xlsx`;
     state.baseOutputSheetName = nomeAbaExcel(`${nome} tratada`);
 
+    // ── Detecta mapeamento de colunas ────────────────────────────────────────
+    const colunas = _inferirColunas(raw);
+
+    // Avisa no toast quais colunas foram detectadas
+    const mapaLegivel = ['nome', 'telefone', 'cnpj', 'responsavel']
+      .filter(f => colunas[f])
+      .map(f => `${colunas[f]} → ${f}`)
+      .join(' | ');
+    if (mapaLegivel) showToast(`Colunas detectadas: ${mapaLegivel}`, 'info', 6000);
+
+    if (!colunas.telefone) throw new Error('Nenhuma coluna de telefone encontrada na planilha.');
+
     const removidos  = [];
     const restantes  = [];
     const vistos     = new Set();
@@ -587,18 +599,16 @@ async function tratarBaseDisparo() {
     for (let i = 0; i < raw.length; i++) {
       const row    = raw[i];
       const linha  = i + 2;
-      const norm   = {};
-      for (const k of Object.keys(row)) norm[_chaveNorm(k)] = row[k];
 
       const correcoes = [];
       const problemas = [];
 
       // ── Nome ────────────────────────────────────────────
       const out = {};
-      out['nome'] = String(norm['nome'] ?? norm['name'] ?? '').trim();
+      out['nome'] = String(row[colunas.nome] ?? '').trim();
 
       // ── Telefone ────────────────────────────────────────
-      const telRaw   = String(norm['telefone'] ?? norm['fone'] ?? norm['celular'] ?? norm['whatsapp'] ?? '').trim();
+      const telRaw   = String(row[colunas.telefone] ?? '').trim();
       const telResult = _formatarTel(telRaw);
       if (telResult.erro) {
         stats.invalidos++;
@@ -618,7 +628,7 @@ async function tratarBaseDisparo() {
       vistos.add(chave);
 
       // ── CNPJ ────────────────────────────────────────────
-      const cnpjRaw = String(norm['cnpj'] ?? '').trim();
+      const cnpjRaw = String(row[colunas.cnpj] ?? '').trim();
       if (cnpjRaw) {
         const cnpjResult = _formatarCnpj(cnpjRaw);
         if (cnpjResult.erro) {
@@ -633,7 +643,7 @@ async function tratarBaseDisparo() {
 
       // ── Responsavel (carterizado) ────────────────────────
       if (isCarterizado) {
-        const resp = String(norm['responsavel'] ?? norm['responsável'] ?? '').trim();
+        const resp = String(row[colunas.responsavel] ?? '').trim();
         if (!resp) {
           problemas.push('responsavel vazio (obrigatório no modo carterizado)');
         } else {
@@ -888,6 +898,101 @@ function _chaveNorm(k) {
   return String(k)
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().trim().replace(/\s+/g, '_');
+}
+
+/**
+ * Infere mapeamento coluna original → campo canônico (nome/telefone/cnpj/responsavel).
+ * Primeira tentativa por sinônimos de cabeçalho; se não achar, analisa conteúdo das linhas.
+ * Retorna objeto { nome, telefone, cnpj, responsavel } com o nome da coluna original.
+ */
+function _inferirColunas(rows) {
+  if (!rows.length) return {};
+
+  const originalKeys = Object.keys(rows[0]);
+  const normToOrig   = {};
+  for (const k of originalKeys) normToOrig[_chaveNorm(k)] = k;
+
+  const SINONIMOS = {
+    nome:        ['nome', 'name', 'razao_social', 'razaosocial', 'empresa', 'cliente',
+                  'contato', 'destinatario', 'corporativo', 'companhia', 'titular',
+                  'estabelecimento', 'fantasia', 'nome_fantasia', 'razao'],
+    telefone:    ['telefone', 'fone', 'celular', 'whatsapp', 'numero', 'tel', 'phone',
+                  'mobile', 'cel', 'numero_whatsapp', 'numero_telefone', 'telefone1',
+                  'telefone2', 'tel1', 'tel2'],
+    cnpj:        ['cnpj', 'cpf', 'cpf_cnpj', 'cnpj_cpf', 'documento', 'doc',
+                  'inscricao', 'cadastro', 'cnpjcpf', 'cpfcnpj', 'cnpj_cpf_destinatario'],
+    responsavel: ['responsavel', 'responsável', 'vendedor', 'atendente', 'consultor',
+                  'gestor', 'operador', 'carteira', 'representante'],
+  };
+
+  const resultado = {};
+  const usados    = new Set();
+
+  // 1ª passagem: correspondência por sinônimo de cabeçalho
+  for (const [campo, sins] of Object.entries(SINONIMOS)) {
+    for (const s of sins) {
+      if (normToOrig[s] && !usados.has(normToOrig[s])) {
+        resultado[campo] = normToOrig[s];
+        usados.add(normToOrig[s]);
+        break;
+      }
+    }
+  }
+
+  // 2ª passagem: inferência por conteúdo para campos ainda não resolvidos
+  const semMatch = ['cnpj', 'telefone', 'nome'].filter(f => !resultado[f]);
+  if (!semMatch.length) return resultado;
+
+  const sample      = rows.slice(0, Math.min(60, rows.length));
+  const chavesLivres = originalKeys.filter(k => !usados.has(k));
+
+  for (const k of chavesLivres) {
+    if (!semMatch.length) break;
+    const vals = sample.map(r => String(r[k] ?? '')).filter(v => v.trim());
+    if (!vals.length) continue;
+    const n = vals.length;
+
+    // CNPJ primeiro (mais específico: exatamente 14 dígitos)
+    if (semMatch.includes('cnpj')) {
+      const score = vals.filter(v => v.replace(/\D/g, '').length === 14).length / n;
+      if (score >= 0.5) {
+        resultado['cnpj'] = k;
+        usados.add(k);
+        semMatch.splice(semMatch.indexOf('cnpj'), 1);
+        continue;
+      }
+    }
+
+    // Telefone (10–13 dígitos)
+    if (semMatch.includes('telefone')) {
+      const score = vals.filter(v => {
+        const d = v.replace(/\D/g, '');
+        return d.length >= 10 && d.length <= 13;
+      }).length / n;
+      if (score >= 0.6) {
+        resultado['telefone'] = k;
+        usados.add(k);
+        semMatch.splice(semMatch.indexOf('telefone'), 1);
+        continue;
+      }
+    }
+
+    // Nome (maioria contém letras e não é CNPJ/telefone)
+    if (semMatch.includes('nome')) {
+      const score = vals.filter(v => {
+        const d = v.replace(/\D/g, '');
+        return /[A-Za-zÀ-ÿ]/.test(v) && d.length !== 14 && !(d.length >= 10 && d.length <= 13);
+      }).length / n;
+      if (score >= 0.65) {
+        resultado['nome'] = k;
+        usados.add(k);
+        semMatch.splice(semMatch.indexOf('nome'), 1);
+        continue;
+      }
+    }
+  }
+
+  return resultado;
 }
 
 /**
