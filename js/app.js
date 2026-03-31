@@ -7,8 +7,8 @@
 (function () {
   const intro = document.getElementById('rocketIntro');
   if (!intro) return;
-  // Remove do DOM depois que a animação de fade-out termina (0.2+0.4+1.8+0.7 ≈ 3.5s)
-  setTimeout(() => intro.remove(), 3500);
+  // Remove do DOM depois que a animação de fade-out termina (0.4+3.6+0.8 ≈ 4.8s)
+  setTimeout(() => intro.remove(), 5000);
 })();
 
 /* ===== PARTICLES ===== */
