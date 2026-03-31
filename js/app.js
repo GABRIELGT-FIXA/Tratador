@@ -787,9 +787,10 @@ async function formatarParaCSV() {
       const norm = {};
       for (const k of Object.keys(row)) norm[_chaveNorm(k)] = row[k];
 
-      // Monta linha de saída preservando TODAS as colunas normalizadas
+      // Monta linha de saída com colunas FIXAS na ordem correta
+      // (evita __EMPTY, colunas duplicadas e lixo do xlsx)
       const out = {};
-      for (const k of Object.keys(norm)) out[k] = norm[k];
+      out['nome'] = String(norm['nome'] ?? norm['name'] ?? '').trim();
 
       // ── Telefone ──────────────────────────────────────────
       const telRaw = String(norm['telefone'] ?? norm['fone'] ?? norm['celular'] ?? norm['whatsapp'] ?? '').trim();
@@ -811,11 +812,13 @@ async function formatarParaCSV() {
           if (cnpjResult.corrigido) correcoes.push(`cnpj: "${cnpjRaw}" → "${cnpjResult.valor}"`);
           out['cnpj'] = cnpjResult.valor;
         }
+      } else {
+        out['cnpj'] = '';
       }
 
       // ── Responsavel (carterizado) ─────────────────────────
       if (isCarterizado) {
-        const resp = String(norm['responsavel'] ?? norm['responsável'] ?? norm['responsavel'] ?? '').trim();
+        const resp = String(norm['responsavel'] ?? norm['responsável'] ?? '').trim();
         if (!resp) problemas.push('responsavel: campo vazio (obrigatório no modo carterizado)');
         else out['responsavel'] = resp;
       }
