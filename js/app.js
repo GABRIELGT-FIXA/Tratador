@@ -162,7 +162,7 @@ function animateCount(el, target) {
 const STATUS_ENVIADO  = new Set(["enviado", "enviada", "sent"]);
 const STATUS_RECEBIDO = new Set(["entregue", "delivered"]);
 const STATUS_SUCESSO  = new Set(["enviado", "enviada", "entregue", "sent", "delivered"]);
-const COLUNAS_SAIDA   = ["Nome", "Telefone", "country code", "Tags", "E-mail", "Cnpj"];
+const COLUNAS_SAIDA   = ["nome", "telefone", "cnpj", "responsavel"];
 
 /* ===== STATE ===== */
 const state = {
@@ -484,12 +484,10 @@ async function processar() {
   try {
     const [p1, p2] = await Promise.all([readExcelFile(state.file1), readExcelFile(state.file2)]);
     state.file1Rows = mapearColunasComSinonimos(p1.rows, [
-      { canonica: "Telefone", obrigatoria: true,  padroes: ["telefone","fone","celular","whatsapp","contato"] },
-      { canonica: "Nome",     obrigatoria: false, padroes: ["nome","cliente","contato nome"] },
-      { canonica: "country code", obrigatoria: false, padroes: ["country code","countrycode","ddi","codigo pais","codigopais"] },
-      { canonica: "Tags",     obrigatoria: false, padroes: ["tags","tag","etiqueta"] },
-      { canonica: "E-mail",   obrigatoria: false, padroes: ["e-mail","email","mail"] },
-      { canonica: "Cnpj",     obrigatoria: false, padroes: ["cnpj","documento","doc"] },
+      { canonica: "telefone",    obrigatoria: true,  padroes: ["telefone","fone","celular","whatsapp","contato"] },
+      { canonica: "nome",        obrigatoria: false, padroes: ["nome","cliente","contato nome"] },
+      { canonica: "cnpj",        obrigatoria: false, padroes: ["cnpj","documento","doc"] },
+      { canonica: "responsavel", obrigatoria: false, padroes: ["responsavel","responsável","resp"] },
     ], "primeira");
 
     state.file2Rows = mapearColunasComSinonimos(p2.rows, [
@@ -708,10 +706,8 @@ async function processarConversaoVcf() {
   try {
     const p = await readExcelFile(state.vcfFile);
     state.vcfRows = mapearColunasComSinonimos(p.rows, [
-      { canonica: "Nome",         obrigatoria: false, padroes: ["nome","cliente","contato nome"] },
-      { canonica: "Telefone",     obrigatoria: false, padroes: ["telefone","fone","celular","whatsapp","contato"] },
-      { canonica: "country code", obrigatoria: false, padroes: ["country code","countrycode","ddi","codigo pais","codigopais"] },
-      { canonica: "E-mail",       obrigatoria: false, padroes: ["e-mail","email","mail"] },
+      { canonica: "nome",     obrigatoria: false, padroes: ["nome","cliente","contato nome"] },
+      { canonica: "telefone", obrigatoria: true,  padroes: ["telefone","fone","celular","whatsapp","contato"] },
     ], "planilha VCF");
 
     const contatos = [];
@@ -1003,8 +999,8 @@ function compararPlanilhas(rows1, rows2, novoNomeBase) {
 
   const removidos = [], restantes = [];
   for (const row of rows1) {
-    const k = chaveComparacao(row["Telefone"]);
-    const base = estruturarLinhaSaida(row, novoNomeBase);
+    const k = chaveComparacao(row["telefone"]);
+    const base = estruturarLinhaSaida(row);
     const statusEnc = (statusPorContato.get(k) || []).join(", ");
     if (!k || !statusPorContato.has(k)) {
       removidos.push({ ...base, "_motivo_remocao": "Contato sem status no relatório", "_status_encontrados": statusEnc });
@@ -1057,10 +1053,13 @@ function classificarTelefoneInvalido(t) {
   return "";
 }
 
-function estruturarLinhaSaida(row, novoNomeBase) {
+function estruturarLinhaSaida(row) {
   const out = {};
-  for (const col of COLUNAS_SAIDA) out[col] = row[col] ?? "";
-  out["Tags"] = novoNomeBase;
+  out["nome"]     = row["nome"]     ?? row["Nome"]     ?? "";
+  out["telefone"] = row["telefone"] ?? row["Telefone"] ?? "";
+  out["cnpj"]     = row["cnpj"]     ?? row["Cnpj"]     ?? "";
+  const resp = row["responsavel"] ?? row["Responsavel"] ?? "";
+  if (resp) out["responsavel"] = resp;
   return out;
 }
 
@@ -1069,14 +1068,10 @@ function chaveComparacao(v)    { const t = normalizarTelefone(v); return t.lengt
 function normalizarStatus(v)   { return String(v ?? "").trim().toLowerCase(); }
 
 function mapearContatoVcf(row, idx) {
-  const nome  = String(row["Nome"]   ?? "").trim();
-  const email = String(row["E-mail"] ?? "").trim();
-  const tBase = normalizarTelefone(row["Telefone"]);
-  const cc    = normalizarTelefone(row["country code"]);
-  let tel = tBase;
-  if (cc && tBase && !tBase.startsWith(cc)) tel = `${cc}${tBase}`;
-  if (!tel && !email) return null;
-  return { nome: nome || `Contato ${idx}`, telefone: tel ? `+${tel}` : "", email };
+  const nome = String(row["nome"] ?? row["Nome"] ?? "").trim();
+  const tel  = normalizarTelefone(row["telefone"] ?? row["Telefone"] ?? "");
+  if (!tel) return null;
+  return { nome: nome || `Contato ${idx}`, telefone: `+${tel}` };
 }
 
 function escapeVcf(v) {
@@ -1091,7 +1086,6 @@ function montarVcf(contatos) {
   return contatos.map(c => {
     const l = ["BEGIN:VCARD", "VERSION:3.0", `FN:${escapeVcf(c.nome)}`];
     if (c.telefone) l.push(`TEL;TYPE=CELL:${escapeVcf(c.telefone)}`);
-    if (c.email)    l.push(`EMAIL;TYPE=INTERNET:${escapeVcf(c.email)}`);
     l.push("END:VCARD");
     return l.join("\r\n");
   }).join("\r\n");

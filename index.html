@@ -89,7 +89,7 @@
               <input id="file1" type="file" accept=".xlsx,.xls" class="hidden" />
               <div id="file1Name" class="file-name empty">nenhum arquivo selecionado</div>
             </div>
-            <p class="file-help">Colunas: <strong>Nome, Telefone, country code, Tags, E-mail, Cnpj</strong></p>
+            <p class="file-help">Colunas: <strong>nome, telefone, cnpj, responsavel</strong> (responsavel somente se carterizado)</p>
           </div>
 
           <div class="control-group">
@@ -133,7 +133,7 @@
           <div class="stat"><div class="stat-k">Total com Erros</div><div class="stat-v bad" id="statErros">0</div></div>
         </div>
 
-        <div class="meta-info" id="metaInfo">Estrutura esperada: Nome, Telefone, country code, Tags, E-mail, Cnpj.</div>
+        <div class="meta-info" id="metaInfo">Estrutura esperada: nome, telefone, cnpj, responsavel (se houver).</div>
 
         <!-- Gráfico Comparador -->
         <div id="comparadorChartWrap" class="chart-container hidden">
@@ -304,7 +304,7 @@
               <input id="vcfFile" type="file" accept=".xlsx,.xls" class="hidden" />
               <div id="vcfFileName" class="file-name empty">nenhum arquivo selecionado</div>
             </div>
-            <p class="file-help">Modelo: <strong>Nome, Telefone, country code, E-mail</strong>. Saída em formato <strong>.vcf</strong>.</p>
+            <p class="file-help">Colunas: <strong>nome, telefone</strong>. O telefone deve estar no formato <strong>DDI+DDD+número</strong> (ex: 5521999999999). Saída em formato <strong>.vcf</strong>.</p>
           </div>
 
           <div class="control-group">
@@ -353,7 +353,7 @@
               <div id="listFilesInfo" class="file-name empty">nenhuma planilha carregada</div>
             </div>
             <button id="btnAddMoreLists" class="btn" style="margin-top:8px;">Adicionar mais planilhas</button>
-            <p class="file-help">Pode carregar uma ou várias planilhas e continuar adicionando depois.</p>
+            <p class="file-help">Formato padrão: <strong>nome, telefone, cnpj, responsavel</strong> (se houver). Pode carregar uma ou várias planilhas.</p>
           </div>
 
           <div class="control-group">
