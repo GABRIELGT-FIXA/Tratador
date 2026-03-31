@@ -922,7 +922,16 @@ function baixarXlsxFormatado() {
  * @param {string[]} colsTexto - nomes de coluna (lowercase) que devem ser texto
  */
 function _xlsxComColunaTexto(rows, colsTexto = []) {
-  const ws    = XLSX.utils.json_to_sheet(rows, { defval: '' });
+  // Coleta todos os cabeçalhos de todas as linhas para não perder colunas
+  // que aparecem só em algumas linhas (ex: responsavel, _correcoes)
+  const allKeys = [];
+  const seen = new Set();
+  for (const row of rows) {
+    for (const k of Object.keys(row)) {
+      if (!seen.has(k)) { seen.add(k); allKeys.push(k); }
+    }
+  }
+  const ws    = XLSX.utils.json_to_sheet(rows, { defval: '', header: allKeys });
   const range = XLSX.utils.decode_range(ws['!ref']);
 
   // Mapa: índice de coluna → nome do header em minúsculo
