@@ -1,5 +1,5 @@
 /* ========================================================
-   app.js — RedispAro v3.0
+   app.js — PowerBase v3.0
    Lógica principal + melhorias modernas
    ======================================================== */
 
@@ -1531,7 +1531,7 @@ function baixarTodasPlanilhas() {
 }
 
 /* ===== HISTÓRICO ===== */
-const HISTORY_KEY  = 'redisparo_historico';
+const HISTORY_KEY  = 'powerbase_historico';
 const HISTORY_MAX  = 10;
 
 function salvarHistorico(entry) {
