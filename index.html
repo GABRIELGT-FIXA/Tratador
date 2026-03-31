@@ -1,0 +1,2195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel de Redisparo</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050912;
+      --surface: #080e1a;
+      --surface-2: #0c1525;
+      --card: rgba(10, 18, 32, 0.85);
+      --card-border: rgba(56, 120, 255, 0.18);
+      --card-border-hover: rgba(56, 120, 255, 0.45);
+      --ink: #e8f0ff;
+      --ink-dim: #8ba0c4;
+      --accent: #3878ff;
+      --accent-2: #00e5ff;
+      --accent-glow: rgba(56, 120, 255, 0.35);
+      --ok: #00e59e;
+      --ok-glow: rgba(0, 229, 158, 0.25);
+      --warn: #ffb84d;
+      --warn-glow: rgba(255, 184, 77, 0.25);
+      --bad: #ff5070;
+      --bad-glow: rgba(255, 80, 112, 0.25);
+      --line: rgba(56, 120, 255, 0.12);
+      --glass: rgba(10, 18, 32, 0.7);
+      --mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Syne', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* CANVAS PARTICLES */
+    #particles-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* GRID OVERLAY */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(56,120,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56,120,255,0.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* AMBIENT GLOW */
+    body::after {
+      content: '';
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 900px;
+      height: 500px;
+      background: radial-gradient(ellipse, rgba(56,120,255,0.12) 0%, transparent 70%);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* TOPBAR */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 28px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 14px 20px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 0 40px rgba(56,120,255,0.08), inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+
+    .logo-mark {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 16px var(--accent-glow);
+      animation: pulse-logo 3s ease-in-out infinite;
+    }
+
+    @keyframes pulse-logo {
+      0%, 100% { box-shadow: 0 0 16px var(--accent-glow); }
+      50% { box-shadow: 0 0 28px rgba(56,120,255,0.6); }
+    }
+
+    .logo-icon svg { width: 20px; height: 20px; fill: #fff; }
+
+    .logo-text {
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 4px;
+      flex: 1;
+      background: rgba(0,0,0,0.3);
+      border-radius: 12px;
+      padding: 4px;
+    }
+
+    .nav-tab {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 9px;
+      border: none;
+      background: transparent;
+      color: var(--ink-dim);
+      font-family: 'Syne', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.2,0.8,0.2,1);
+      white-space: nowrap;
+      position: relative;
+      letter-spacing: 0.03em;
+    }
+
+    .nav-tab:hover { color: var(--ink); background: rgba(56,120,255,0.1); }
+
+    .nav-tab.active {
+      background: linear-gradient(135deg, rgba(56,120,255,0.25), rgba(0,229,255,0.1));
+      color: var(--ink);
+      border: 1px solid rgba(56,120,255,0.35);
+      box-shadow: 0 0 16px rgba(56,120,255,0.2);
+    }
+
+    .nav-tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 30px;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      border-radius: 2px;
+    }
+
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .toggle-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ink-dim);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      display: inline-block;
+    }
+
+    .switch input { opacity: 0; width: 0; height: 0; }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: rgba(255,255,255,0.08);
+      border-radius: 999px;
+      border: 1px solid var(--card-border);
+      transition: 0.3s ease;
+    }
+
+    .slider:before {
+      content: "";
+      position: absolute;
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      top: 3px;
+      background: var(--ink-dim);
+      border-radius: 50%;
+      transition: 0.3s ease;
+    }
+
+    .switch input:checked + .slider {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border-color: var(--accent);
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    .switch input:checked + .slider:before {
+      transform: translateX(20px);
+      background: #fff;
+    }
+
+    /* HERO BANNER */
+    .hero-banner {
+      position: relative;
+      height: 180px;
+      border-radius: 20px;
+      overflow: hidden;
+      margin-bottom: 24px;
+      border: 1px solid var(--card-border);
+      box-shadow: 0 0 60px rgba(56,120,255,0.15);
+    }
+
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(135deg, rgba(5,9,18,0.95) 0%, rgba(5,9,18,0.6) 50%, rgba(5,9,18,0.9) 100%),
+        url("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTOImm2dQsThd4LdYPvnikTmksCYy_vyc8krA&s") center/cover no-repeat;
+    }
+
+    .hero-scan {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, transparent 0%, rgba(56,120,255,0.04) 50%, transparent 100%);
+      animation: scan 4s linear infinite;
+    }
+
+    @keyframes scan {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(100%); }
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 24px 28px;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(0,229,255,0.35);
+      background: rgba(0,229,255,0.08);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+      margin-bottom: 10px;
+      backdrop-filter: blur(10px);
+      width: fit-content;
+    }
+
+    .hero-badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-2);
+      box-shadow: 0 0 8px var(--accent-2);
+      animation: blink 2s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .hero-title {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(90deg, #fff 0%, var(--accent-2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1.1;
+    }
+
+    .hero-corners span {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+    }
+    .hero-corners span:nth-child(1) { top: 12px; left: 12px; border-top: 2px solid rgba(56,120,255,0.5); border-left: 2px solid rgba(56,120,255,0.5); }
+    .hero-corners span:nth-child(2) { top: 12px; right: 12px; border-top: 2px solid rgba(56,120,255,0.5); border-right: 2px solid rgba(56,120,255,0.5); }
+    .hero-corners span:nth-child(3) { bottom: 12px; left: 12px; border-bottom: 2px solid rgba(56,120,255,0.5); border-left: 2px solid rgba(56,120,255,0.5); }
+    .hero-corners span:nth-child(4) { bottom: 12px; right: 12px; border-bottom: 2px solid rgba(56,120,255,0.5); border-right: 2px solid rgba(56,120,255,0.5); }
+
+    /* CARD */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 24px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 0 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04);
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .card:hover {
+      border-color: var(--card-border-hover);
+      box-shadow: 0 0 60px rgba(56,120,255,0.1), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .section-title-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, rgba(56,120,255,0.2), rgba(0,229,255,0.1));
+      border: 1px solid rgba(56,120,255,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .section-title-icon svg { width: 18px; height: 18px; stroke: var(--accent-2); fill: none; stroke-width: 2; }
+
+    .section-title h1 {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+    }
+
+    .section-title h1 span { color: var(--accent-2); }
+
+    /* CONTROLS */
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .control-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-dim);
+    }
+
+    /* BUTTONS */
+    .btn {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(56,120,255,0.25);
+      background: rgba(56,120,255,0.08);
+      color: var(--ink);
+      border-radius: 12px;
+      padding: 11px 16px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.2,0.8,0.2,1);
+      letter-spacing: 0.02em;
+    }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(56,120,255,0.15), transparent);
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+
+    .btn:hover:not(:disabled) {
+      border-color: rgba(56,120,255,0.6);
+      background: rgba(56,120,255,0.15);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(56,120,255,0.2);
+    }
+
+    .btn:hover::before { opacity: 1; }
+
+    .btn:active:not(:disabled) { transform: translateY(0); }
+
+    .btn.primary {
+      background: linear-gradient(135deg, var(--accent), rgba(56,120,255,0.7));
+      border-color: var(--accent);
+      box-shadow: 0 0 20px var(--accent-glow);
+      color: #fff;
+    }
+
+    .btn.primary:hover:not(:disabled) {
+      box-shadow: 0 8px 32px rgba(56,120,255,0.5);
+      background: linear-gradient(135deg, #5090ff, var(--accent));
+    }
+
+    .btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .btn-ripple {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      width: 10px; height: 10px;
+      transform: scale(0);
+      animation: ripple 0.5s linear;
+      pointer-events: none;
+    }
+
+    @keyframes ripple {
+      to { transform: scale(30); opacity: 0; }
+    }
+
+    /* FILE INPUT */
+    .file-drop-zone {
+      border: 1px dashed rgba(56,120,255,0.3);
+      border-radius: 12px;
+      padding: 14px;
+      background: rgba(56,120,255,0.04);
+      transition: all 0.25s ease;
+      cursor: pointer;
+    }
+
+    .file-drop-zone:hover {
+      border-color: rgba(56,120,255,0.6);
+      background: rgba(56,120,255,0.08);
+    }
+
+    .file-drop-zone.has-file {
+      border-color: rgba(0,229,158,0.4);
+      background: rgba(0,229,158,0.05);
+    }
+
+    .file-name {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--ok);
+      margin-top: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file-name.empty { color: var(--ink-dim); }
+
+    .file-help {
+      font-size: 11px;
+      color: var(--ink-dim);
+      line-height: 1.5;
+      margin-top: 4px;
+    }
+
+    .file-help strong { color: var(--accent-2); font-weight: 600; }
+
+    /* TEXT INPUT */
+    .text-input {
+      width: 100%;
+      border: 1px solid rgba(56,120,255,0.2);
+      border-radius: 12px;
+      padding: 11px 14px;
+      background: rgba(0,0,0,0.3);
+      color: var(--ink);
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      transition: all 0.25s ease;
+    }
+
+    .text-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(56,120,255,0.15);
+      background: rgba(56,120,255,0.05);
+    }
+
+    .text-input::placeholder { color: rgba(139,160,196,0.5); }
+
+    /* STATUS BAR */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--line);
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--ink-dim);
+      transition: all 0.3s ease;
+    }
+
+    .status-bar::before {
+      content: '>';
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .status-bar.success { color: var(--ok); border-color: rgba(0,229,158,0.2); background: rgba(0,229,158,0.05); }
+    .status-bar.error { color: var(--bad); border-color: rgba(255,80,112,0.2); background: rgba(255,80,112,0.05); }
+
+    /* STATS */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .stat {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      background: rgba(0,0,0,0.3);
+      transition: all 0.3s ease;
+    }
+
+    .stat::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--stat-color, var(--accent)), transparent);
+      opacity: 0.5;
+    }
+
+    .stat:hover { transform: translateY(-3px); }
+
+    .stat-k {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink-dim);
+    }
+
+    .stat-v {
+      font-size: 32px;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-top: 6px;
+      font-family: var(--mono);
+      transition: all 0.5s cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    .stat-v.ok { color: var(--ok); text-shadow: 0 0 20px var(--ok-glow); --stat-color: var(--ok); }
+    .stat-v.warn { color: var(--warn); text-shadow: 0 0 20px var(--warn-glow); --stat-color: var(--warn); }
+    .stat-v.bad { color: var(--bad); text-shadow: 0 0 20px var(--bad-glow); --stat-color: var(--bad); }
+
+    .meta-info {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--ink-dim);
+      margin-top: 14px;
+      padding: 10px 14px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      border-left: 2px solid rgba(56,120,255,0.4);
+    }
+
+    /* GRID */
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    @media (max-width: 768px) { .grid2 { grid-template-columns: 1fr; } }
+
+    /* PANEL HEADER */
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .panel-head h2 {
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-head h2::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      background: var(--accent);
+    }
+
+    .count-badge {
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(56,120,255,0.1);
+      border: 1px solid rgba(56,120,255,0.2);
+      color: var(--accent-2);
+      font-weight: 600;
+    }
+
+    /* TABLE */
+    .table-wrap {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: auto;
+      max-height: 300px;
+      background: rgba(0,0,0,0.25);
+    }
+
+    .table-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+    .table-wrap::-webkit-scrollbar-track { background: transparent; }
+    .table-wrap::-webkit-scrollbar-thumb { background: rgba(56,120,255,0.3); border-radius: 3px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      min-width: 600px;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: rgba(8,14,26,0.95);
+      padding: 10px 12px;
+      text-align: left;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent-2);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border-bottom: 1px solid rgba(56,120,255,0.2);
+      backdrop-filter: blur(10px);
+    }
+
+    td {
+      padding: 9px 12px;
+      text-align: left;
+      vertical-align: top;
+      color: var(--ink-dim);
+      border-bottom: 1px solid rgba(56,120,255,0.06);
+      font-family: var(--mono);
+      font-size: 11px;
+      transition: color 0.15s ease;
+    }
+
+    tr:hover td { color: var(--ink); background: rgba(56,120,255,0.04); }
+
+    /* SECTIONS */
+    .section { display: none; }
+    .section.active { display: block; animation: sectionIn 380ms cubic-bezier(0.2,0.8,0.2,1) both; }
+
+    @keyframes sectionIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .section.active .card { animation: cardIn 400ms cubic-bezier(0.2,0.8,0.2,1) both; }
+    .section.active .grid2 .card:nth-child(1) { animation-delay: 60ms; }
+    .section.active .grid2 .card:nth-child(2) { animation-delay: 120ms; }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .hidden { display: none; }
+
+    .select-input {
+      width: 100%;
+      border: 1px solid rgba(56,120,255,0.2);
+      border-radius: 12px;
+      padding: 11px 14px;
+      background: rgba(0,0,0,0.3);
+      color: var(--ink);
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      transition: all 0.25s ease;
+    }
+
+    .select-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(56,120,255,0.15);
+      background: rgba(56,120,255,0.05);
+    }
+
+    .header-editor {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(0,0,0,0.22);
+      max-height: 320px;
+      overflow: auto;
+    }
+
+    .header-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .header-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn.mini {
+      padding: 8px 10px;
+      font-size: 11px;
+      min-width: 38px;
+    }
+
+    .editable-cell {
+      outline: none;
+      cursor: text;
+      min-width: 90px;
+    }
+
+    .editable-cell:focus {
+      box-shadow: inset 0 0 0 2px rgba(56,120,255,0.35);
+      background: rgba(56,120,255,0.08);
+      color: var(--ink);
+      border-radius: 6px;
+    }
+
+    /* LIGHT MODE */
+    body.light {
+      --bg: #f0f4ff;
+      --surface: #e8eeff;
+      --card: rgba(255,255,255,0.88);
+      --card-border: rgba(56,120,255,0.2);
+      --card-border-hover: rgba(56,120,255,0.5);
+      --ink: #0a1428;
+      --ink-dim: #4a6090;
+      --line: rgba(56,120,255,0.15);
+      --glass: rgba(240,244,255,0.8);
+    }
+
+    body.light::before {
+      background-image:
+        linear-gradient(rgba(56,120,255,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56,120,255,0.06) 1px, transparent 1px);
+    }
+
+    body.light .hero-bg {
+      background:
+        linear-gradient(135deg, rgba(240,244,255,0.95) 0%, rgba(220,232,255,0.8) 50%, rgba(240,244,255,0.95) 100%),
+        url("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTOImm2dQsThd4LdYPvnikTmksCYy_vyc8krA&s") center/cover no-repeat;
+    }
+
+    body.light .nav-tabs { background: rgba(0,0,0,0.05); }
+    body.light .text-input { background: rgba(255,255,255,0.7); }
+    body.light .select-input { background: rgba(255,255,255,0.7); }
+    body.light th { background: rgba(240,244,255,0.98); color: var(--accent); }
+    body.light td { color: #4a6090; }
+    body.light tr:hover td { background: rgba(56,120,255,0.04); color: var(--ink); }
+    body.light .status-bar { background: rgba(0,0,0,0.04); }
+    body.light .meta-info { background: rgba(56,120,255,0.04); }
+    body.light .table-wrap { background: rgba(255,255,255,0.5); }
+    body.light .stat { background: rgba(255,255,255,0.6); }
+    body.light .header-editor { background: rgba(255,255,255,0.5); }
+
+    /* LOADING SPINNER */
+    .btn-loading {
+      pointer-events: none;
+    }
+
+    .btn-loading .btn-text { opacity: 0; }
+
+    .btn-loading::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      margin: auto;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* FOOTER */
+    .footer {
+      text-align: center;
+      margin-top: 48px;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      color: rgba(139,160,196,0.3);
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 640px) {
+      .nav-tabs { overflow-x: auto; }
+      .nav-tab { font-size: 11px; padding: 7px 10px; }
+      .hero-title { font-size: 20px; }
+      .topbar { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="particles-canvas"></canvas>
+
+  <div class="wrap">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div class="logo-mark">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
+        <span class="logo-text">RedispAro</span>
+      </div>
+
+      <nav class="nav-tabs" role="tablist">
+        <button class="nav-tab active" data-section="comparador" role="tab">Comparador</button>
+        <button class="nav-tab" data-section="tratamento" role="tab">Tratamento</button>
+        <button class="nav-tab" data-section="vcf" role="tab">XLSX → VCF</button>
+        <button class="nav-tab" data-section="editor" role="tab">Editor de Listas</button>
+      </nav>
+
+      <div class="theme-toggle">
+        <span id="themeLabel" class="toggle-label">Escuro</span>
+        <label class="switch" for="themeToggle">
+          <input id="themeToggle" type="checkbox" />
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- HERO -->
+    <div class="hero-banner">
+      <div class="hero-bg"></div>
+      <div class="hero-scan"></div>
+      <div class="hero-corners">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <div class="hero-content">
+        <div class="hero-badge">Sistema Ativo</div>
+        <h1 class="hero-title">Painel de Redisparo</h1>
+      </div>
+    </div>
+
+    <!-- SECTION: COMPARADOR -->
+    <section id="sectionComparador" class="section active">
+      <div class="card" style="margin-bottom:16px;">
+        <div class="section-title">
+          <div class="section-title-icon">
+            <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+          <h1>Comparador de Erros para <span>Redisparo</span></h1>
+        </div>
+
+        <div class="controls">
+          <div class="control-group">
+            <span class="control-label">Planilha 1 - Base Original</span>
+            <div class="file-drop-zone" id="dropZone1">
+              <button id="btnFile1" class="btn" style="width:100%;">Selecionar arquivo</button>
+              <input id="file1" type="file" accept=".xlsx,.xls" class="hidden" />
+              <div id="file1Name" class="file-name empty">nenhum arquivo selecionado</div>
+            </div>
+            <p class="file-help">Colunas: <strong>Nome, Telefone, country code, Tags, E-mail, Cnpj</strong></p>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">Planilha 2 - Relatório do Disparo</span>
+            <div class="file-drop-zone" id="dropZone2">
+              <button id="btnFile2" class="btn" style="width:100%;">Selecionar arquivo</button>
+              <input id="file2" type="file" accept=".xlsx,.xls" class="hidden" />
+              <div id="file2Name" class="file-name empty">nenhum arquivo selecionado</div>
+            </div>
+            <p class="file-help">Deve conter <strong>Contato</strong> e <strong>Status de Mensagem</strong></p>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">Nome do Chip (Redisparo)</span>
+            <input id="chipInput" class="text-input" type="text" placeholder="Ex.: CHIP_01" maxlength="80" />
+            <p class="file-help">Adicionado ao nome de saída e à coluna <strong>Tags</strong></p>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">Ações</span>
+            <button id="btnProcessar" class="btn primary" disabled>
+              <span class="btn-text">Iniciar Operação</span>
+            </button>
+            <button id="btnDownload" class="btn" disabled style="margin-top:8px;">
+              <span class="btn-text">Baixar Redisparado (.xlsx)</span>
+            </button>
+            <div id="statusMsg" class="status-bar">Selecione as duas planilhas para continuar.</div>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><div class="stat-k">Total de Contatos</div><div class="stat-v" id="statContatos">0</div></div>
+          <div class="stat"><div class="stat-k">Total Enviados</div><div class="stat-v warn" id="statEnviados">0</div></div>
+          <div class="stat"><div class="stat-k">Total Recebidos</div><div class="stat-v ok" id="statRecebidos">0</div></div>
+          <div class="stat"><div class="stat-k">Total com Erros</div><div class="stat-v bad" id="statErros">0</div></div>
+        </div>
+
+        <div class="meta-info" id="metaInfo">Estrutura esperada: Nome, Telefone, country code, Tags, E-mail, Cnpj.</div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <div class="panel-head">
+            <h2>Removidos</h2>
+            <span class="count-badge" id="removedCount">0 registros</span>
+          </div>
+          <div class="table-wrap">
+            <table id="removedTable"><thead></thead><tbody></tbody></table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="panel-head">
+            <h2>Restantes</h2>
+            <span class="count-badge" id="remainingCount">0 registros</span>
+          </div>
+          <div class="table-wrap">
+            <table id="remainingTable"><thead></thead><tbody></tbody></table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: TRATAMENTO -->
+    <section id="sectionTratamento" class="section">
+      <div class="card" style="margin-bottom:16px;">
+        <div class="section-title">
+          <div class="section-title-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <h1>Tratamento da <span>Base do Disparo</span></h1>
+        </div>
+
+        <div class="controls">
+          <div class="control-group" style="grid-column: span 2;">
+            <span class="control-label">Base do Disparo</span>
+            <div class="file-drop-zone" id="dropZoneBase">
+              <button id="btnBaseFile" class="btn" style="width:100%;">Selecionar base</button>
+              <input id="baseFile" type="file" accept=".xlsx,.xls" class="hidden" />
+              <div id="baseFileName" class="file-name empty">nenhum arquivo selecionado</div>
+            </div>
+            <p class="file-help">Remove contatos duplicados e números incompletos/vazios automaticamente.</p>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">Ações</span>
+            <button id="btnTratarBase" class="btn primary" disabled>
+              <span class="btn-text">Iniciar Operação</span>
+            </button>
+            <button id="btnDownloadBaseTratada" class="btn" disabled style="margin-top:8px;">
+              <span class="btn-text">Baixar Base Tratada (.xlsx)</span>
+            </button>
+            <div id="statusBaseMsg" class="status-bar">Selecione a base para habilitar o tratamento.</div>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><div class="stat-k">Total da Base</div><div class="stat-v" id="statBaseTotal">0</div></div>
+          <div class="stat"><div class="stat-k">Duplicados Removidos</div><div class="stat-v warn" id="statDuplicados">0</div></div>
+          <div class="stat"><div class="stat-k">Números Inválidos</div><div class="stat-v bad" id="statInvalidos">0</div></div>
+          <div class="stat"><div class="stat-k">Restantes Válidos</div><div class="stat-v ok" id="statBaseRestantes">0</div></div>
+        </div>
+
+        <div class="meta-info" id="metaTratamentoInfo">Critérios: telefone vazio, incompleto (55+DDD) e duplicados normalizados.</div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <div class="panel-head">
+            <h2>Removidos (Tratamento)</h2>
+            <span class="count-badge" id="baseRemovedCount">0 registros</span>
+          </div>
+          <div class="table-wrap">
+            <table id="baseRemovedTable"><thead></thead><tbody></tbody></table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="panel-head">
+            <h2>Base Tratada</h2>
+            <span class="count-badge" id="baseRemainingCount">0 registros</span>
+          </div>
+          <div class="table-wrap">
+            <table id="baseRemainingTable"><thead></thead><tbody></tbody></table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: VCF -->
+    <section id="sectionVcf" class="section">
+      <div class="card">
+        <div class="section-title">
+          <div class="section-title-icon">
+            <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <h1>Conversor XLSX para <span>VCF (Talk)</span></h1>
+        </div>
+
+        <div class="controls">
+          <div class="control-group" style="grid-column: span 2;">
+            <span class="control-label">Planilha para Conversão</span>
+            <div class="file-drop-zone" id="dropZoneVcf">
+              <button id="btnVcfFile" class="btn" style="width:100%;">Selecionar planilha</button>
+              <input id="vcfFile" type="file" accept=".xlsx,.xls" class="hidden" />
+              <div id="vcfFileName" class="file-name empty">nenhum arquivo selecionado</div>
+            </div>
+            <p class="file-help">Modelo: <strong>Nome, Telefone, country code, E-mail</strong>. Saída em formato <strong>.vcf</strong>.</p>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">Ações</span>
+            <button id="btnConverterVcf" class="btn primary" disabled>
+              <span class="btn-text">Converter para .vcf</span>
+            </button>
+            <button id="btnDownloadVcf" class="btn" disabled style="margin-top:8px;">
+              <span class="btn-text">Baixar Contatos (.vcf)</span>
+            </button>
+            <div id="statusVcfMsg" class="status-bar">Selecione uma planilha para converter.</div>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><div class="stat-k">Total Lidos</div><div class="stat-v" id="statVcfTotal">0</div></div>
+          <div class="stat"><div class="stat-k">Contatos Gerados</div><div class="stat-v ok" id="statVcfGerados">0</div></div>
+          <div class="stat"><div class="stat-k">Linhas Ignoradas</div><div class="stat-v warn" id="statVcfIgnorados">0</div></div>
+        </div>
+
+        <div class="meta-info" id="metaVcfInfo">Regra: necessário ao menos telefone ou e-mail para gerar contato no VCF.</div>
+      </div>
+    </section>
+
+    <section id="sectionEditor" class="section">
+      <div class="card" style="margin-bottom:16px;">
+        <div class="section-title">
+          <div class="section-title-icon">
+            <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><path d="M9 4v16"/></svg>
+          </div>
+          <h1>Editor de <span>Listas e Estrutura</span></h1>
+        </div>
+
+        <div class="controls">
+          <div class="control-group">
+            <span class="control-label">Importacao</span>
+            <div class="file-drop-zone" id="dropZoneListas">
+              <button id="btnListFiles" class="btn" style="width:100%;">Carregar planilha(s)</button>
+              <input id="listFiles" type="file" accept=".xlsx,.xls,.csv" multiple class="hidden" />
+              <div id="listFilesInfo" class="file-name empty">nenhuma planilha carregada</div>
+            </div>
+            <button id="btnAddMoreLists" class="btn" style="margin-top:8px;">Adicionar mais planilhas</button>
+            <p class="file-help">Pode carregar uma ou varias planilhas e continuar adicionando depois.</p>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">Planilha ativa</span>
+            <select id="sheetPicker" class="select-input" disabled>
+              <option value="">Nenhuma planilha carregada</option>
+            </select>
+            <input id="sheetNameInput" class="text-input" type="text" maxlength="80" placeholder="Nome da aba ativa" />
+            <button id="btnCreateEmptySheet" class="btn">Criar planilha vazia</button>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">Estrutura</span>
+            <input id="newHeaderInput" class="text-input" type="text" maxlength="80" placeholder="Novo cabecalho" />
+            <button id="btnAddHeader" class="btn">Adicionar cabecalho</button>
+            <button id="btnApplyStructureAll" class="btn" style="margin-top:8px;">Aplicar estrutura da primeira em todas</button>
+            <button id="btnMergeAllData" class="btn" style="margin-top:8px;">Juntar dados de todas</button>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">Exportacao</span>
+            <button id="btnDownloadActiveSheet" class="btn primary" disabled>
+              <span class="btn-text">Baixar planilha ativa (.xlsx)</span>
+            </button>
+            <button id="btnDownloadAllSheets" class="btn" disabled style="margin-top:8px;">
+              <span class="btn-text">Baixar todas as planilhas (.xlsx)</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="statusListMsg" class="status-bar">Carregue uma ou mais planilhas para editar cabecalhos e dados.</div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <div class="panel-head">
+            <h2>Cabecalhos</h2>
+            <span class="count-badge" id="listHeaderCount">0 cabecalhos</span>
+          </div>
+          <div id="headerEditorBox" class="header-editor">Nenhuma planilha ativa.</div>
+        </div>
+        <div class="card">
+          <div class="panel-head">
+            <h2>Dados da Planilha</h2>
+            <span class="count-badge" id="listRowCount">0 linhas</span>
+          </div>
+          <div class="table-wrap">
+            <table id="listEditorTable"><thead></thead><tbody></tbody></table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">RedispAro System &nbsp;·&nbsp; v2.0</div>
+  </div>
+
+  <script>
+    /* PARTICLES */
+    (function() {
+      const canvas = document.getElementById('particles-canvas');
+      const ctx = canvas.getContext('2d');
+      let W, H, particles = [];
+
+      function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+      }
+
+      class Particle {
+        constructor() { this.reset(); }
+        reset() {
+          this.x = Math.random() * W;
+          this.y = Math.random() * H;
+          this.size = Math.random() * 1.5 + 0.3;
+          this.speedX = (Math.random() - 0.5) * 0.3;
+          this.speedY = (Math.random() - 0.5) * 0.3;
+          this.opacity = Math.random() * 0.4 + 0.05;
+          this.color = Math.random() > 0.5 ? '56,120,255' : '0,229,255';
+        }
+        update() {
+          this.x += this.speedX;
+          this.y += this.speedY;
+          if (this.x < 0 || this.x > W || this.y < 0 || this.y > H) this.reset();
+        }
+        draw() {
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(${this.color},${this.opacity})`;
+          ctx.fill();
+        }
+      }
+
+      function init() {
+        resize();
+        particles = Array.from({ length: 80 }, () => new Particle());
+        animate();
+      }
+
+      function animate() {
+        ctx.clearRect(0, 0, W, H);
+        particles.forEach(p => { p.update(); p.draw(); });
+
+        // draw connections
+        for (let i = 0; i < particles.length; i++) {
+          for (let j = i + 1; j < particles.length; j++) {
+            const dx = particles[i].x - particles[j].x;
+            const dy = particles[i].y - particles[j].y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < 100) {
+              ctx.beginPath();
+              ctx.moveTo(particles[i].x, particles[i].y);
+              ctx.lineTo(particles[j].x, particles[j].y);
+              ctx.strokeStyle = `rgba(56,120,255,${0.08 * (1 - dist/100)})`;
+              ctx.lineWidth = 0.5;
+              ctx.stroke();
+            }
+          }
+        }
+
+        requestAnimationFrame(animate);
+      }
+
+      window.addEventListener('resize', resize);
+      init();
+    })();
+
+    /* RIPPLE */
+    document.querySelectorAll('.btn').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        const ripple = document.createElement('span');
+        ripple.className = 'btn-ripple';
+        const rect = this.getBoundingClientRect();
+        ripple.style.left = (e.clientX - rect.left - 5) + 'px';
+        ripple.style.top = (e.clientY - rect.top - 5) + 'px';
+        this.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 600);
+      });
+    });
+
+    /* STAT COUNTER ANIMATION */
+    function animateCount(el, target) {
+      const start = parseInt(el.textContent) || 0;
+      const duration = 600;
+      const startTime = performance.now();
+      function step(now) {
+        const progress = Math.min((now - startTime) / duration, 1);
+        const ease = 1 - Math.pow(1 - progress, 3);
+        el.textContent = String(Math.round(start + (target - start) * ease));
+        if (progress < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    /* APP STATE & LOGIC */
+    const STATUS_ENVIADO = new Set(["enviado", "enviada", "sent"]);
+    const STATUS_RECEBIDO = new Set(["entregue", "delivered"]);
+    const STATUS_SUCESSO = new Set(["enviado", "enviada", "entregue", "sent", "delivered"]);
+    const COLUNAS_SAIDA = ["Nome", "Telefone", "country code", "Tags", "E-mail", "Cnpj"];
+
+    const state = {
+      file1: null, file2: null,
+      file1Rows: [], file2Rows: [],
+      removedRows: [], remainingRows: [],
+      outputFileName: "", outputSheetName: "",
+      baseFile: null, baseRows: [],
+      baseRemovedRows: [], baseRemainingRows: [],
+      baseOutputFileName: "", baseOutputSheetName: "",
+      vcfFile: null, vcfRows: [],
+      vcfContacts: [], vcfContent: "", vcfOutputFileName: "",
+      listSheets: [],
+      activeListSheetId: "",
+      listSheetCounter: 1,
+    };
+
+    const $ = id => document.getElementById(id);
+
+    /* theme */
+    function inicializarTema() {
+      const saved = localStorage.getItem("comparaErroTema");
+      const prefer = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const tema = saved || (prefer ? "dark" : "light");
+      aplicarTema(tema);
+      $("themeToggle").checked = tema === "light";
+    }
+
+    function aplicarTema(tema) {
+      document.body.classList.toggle("light", tema === "light");
+      $("themeLabel").textContent = tema === "light" ? "Claro" : "Escuro";
+    }
+
+    $("themeToggle").addEventListener("change", () => {
+      const tema = $("themeToggle").checked ? "light" : "dark";
+      aplicarTema(tema);
+      localStorage.setItem("comparaErroTema", tema);
+    });
+
+    /* nav tabs */
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        const target = tab.dataset.section;
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        let sec = $("sectionComparador");
+        if (target === 'tratamento') sec = $("sectionTratamento");
+        else if (target === 'vcf') sec = $("sectionVcf");
+        else if (target === 'editor') sec = $("sectionEditor");
+        sec.classList.add('active');
+      });
+    });
+
+    /* file pick helpers */
+    function setupFilePick(btnId, inputId, nameId, dropZoneId, onPick) {
+      $(btnId).addEventListener('click', () => $(inputId).click());
+      $(inputId).addEventListener('change', e => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const nameEl = $(nameId);
+        nameEl.textContent = file.name;
+        nameEl.classList.remove('empty');
+        if (dropZoneId) $(dropZoneId).classList.add('has-file');
+        onPick(file);
+      });
+    }
+
+    function setStatus(id, text, type = '') {
+      const el = $(id);
+      el.textContent = text;
+      el.className = 'status-bar' + (type ? ' ' + type : '');
+    }
+
+    setupFilePick('btnFile1', 'file1', 'file1Name', 'dropZone1', file => {
+      state.file1 = file;
+      setStatus('statusMsg', 'Planilha 1 carregada. Selecione a 2ª planilha.');
+      $('btnProcessar').disabled = !(state.file1 && state.file2);
+      $('btnDownload').disabled = true;
+      atualizarPreviewSaidaRedisparo();
+    });
+
+    setupFilePick('btnFile2', 'file2', 'file2Name', 'dropZone2', file => {
+      state.file2 = file;
+      setStatus('statusMsg', 'Arquivos prontos. Clique em Iniciar Operação.');
+      $('btnProcessar').disabled = !(state.file1 && state.file2);
+      $('btnDownload').disabled = true;
+    });
+
+    $('chipInput').addEventListener('input', atualizarPreviewSaidaRedisparo);
+
+    setupFilePick('btnBaseFile', 'baseFile', 'baseFileName', 'dropZoneBase', file => {
+      state.baseFile = file;
+      setStatus('statusBaseMsg', 'Base carregada. Clique em Iniciar Operação.');
+      $('btnTratarBase').disabled = false;
+      $('btnDownloadBaseTratada').disabled = true;
+    });
+
+    setupFilePick('btnVcfFile', 'vcfFile', 'vcfFileName', 'dropZoneVcf', file => {
+      state.vcfFile = file;
+      Object.assign(state, { vcfRows: [], vcfContacts: [], vcfContent: '', vcfOutputFileName: '' });
+      setStatus('statusVcfMsg', 'Planilha carregada. Clique em Converter.');
+      $('btnConverterVcf').disabled = false;
+      $('btnDownloadVcf').disabled = true;
+      ['statVcfTotal','statVcfGerados','statVcfIgnorados'].forEach(id => $(id).textContent = '0');
+    });
+
+    $('btnListFiles').addEventListener('click', () => $('listFiles').click());
+    $('btnAddMoreLists').addEventListener('click', () => $('listFiles').click());
+    $('listFiles').addEventListener('change', handleListFilePick);
+    $('sheetPicker').addEventListener('change', handleSheetSelection);
+    $('sheetNameInput').addEventListener('input', handleSheetRename);
+    $('btnCreateEmptySheet').addEventListener('click', criarPlanilhaVazia);
+    $('btnAddHeader').addEventListener('click', handleAddHeader);
+    $('btnApplyStructureAll').addEventListener('click', aplicarEstruturaPrimeiraEmTodas);
+    $('btnMergeAllData').addEventListener('click', juntarDadosDeTodasPlanilhas);
+    $('btnDownloadActiveSheet').addEventListener('click', baixarPlanilhaAtiva);
+    $('btnDownloadAllSheets').addEventListener('click', baixarTodasPlanilhas);
+    $('headerEditorBox').addEventListener('click', handleHeaderActions);
+    $('headerEditorBox').addEventListener('change', handleHeaderRename);
+    $('listEditorTable').addEventListener('input', handleCellInput);
+
+    /* actions */
+    $('btnProcessar').addEventListener('click', processar);
+    $('btnDownload').addEventListener('click', baixarResultado);
+    $('btnTratarBase').addEventListener('click', tratarBaseDisparo);
+    $('btnDownloadBaseTratada').addEventListener('click', baixarBaseTratada);
+    $('btnConverterVcf').addEventListener('click', processarConversaoVcf);
+    $('btnDownloadVcf').addEventListener('click', baixarVcf);
+
+    async function processar() {
+      if (!state.file1 || !state.file2) return;
+      setStatus('statusMsg', 'Lendo planilhas...');
+      $('btnProcessar').classList.add('btn-loading');
+      $('btnProcessar').disabled = true;
+      try {
+        const [p1, p2] = await Promise.all([readExcelFile(state.file1), readExcelFile(state.file2)]);
+        state.file1Rows = mapearColunasComSinonimos(p1.rows, [
+          { canonica: "Telefone", obrigatoria: true, padroes: ["telefone", "fone", "celular", "whatsapp", "contato"] },
+          { canonica: "Nome", obrigatoria: false, padroes: ["nome", "cliente", "contato nome"] },
+          { canonica: "country code", obrigatoria: false, padroes: ["country code", "countrycode", "ddi", "codigo pais", "codigopais"] },
+          { canonica: "Tags", obrigatoria: false, padroes: ["tags", "tag", "etiqueta"] },
+          { canonica: "E-mail", obrigatoria: false, padroes: ["e-mail", "email", "mail"] },
+          { canonica: "Cnpj", obrigatoria: false, padroes: ["cnpj", "documento", "doc"] },
+        ], "primeira");
+        state.file2Rows = mapearColunasComSinonimos(p2.rows, [
+          { canonica: "Contato", obrigatoria: true, padroes: ["contato", "telefone", "fone", "celular", "whatsapp"] },
+          { canonica: "Status de Mensagem", obrigatoria: true, padroes: ["status de mensagem", "status mensagem", "status", "situacao", "situação"] },
+        ], "segunda");
+        const nomeBase1 = removeExtensao(state.file1.name);
+        const chip = obterChipInformado();
+        const novoNomeBase = montarNomeRedisparo(nomeBase1, chip);
+        state.outputFileName = `${novoNomeBase}.xlsx`;
+        state.outputSheetName = nomeAbaExcel(novoNomeBase);
+        const resultado = compararPlanilhas(state.file1Rows, state.file2Rows, novoNomeBase);
+        state.removedRows = resultado.removidos;
+        state.remainingRows = resultado.restantes;
+        animateCount($('statContatos'), state.file1Rows.length);
+        animateCount($('statEnviados'), resultado.stats.enviados);
+        animateCount($('statRecebidos'), resultado.stats.recebidos);
+        animateCount($('statErros'), resultado.stats.erros);
+        renderTabela('removedTable', state.removedRows);
+        renderTabela('remainingTable', state.remainingRows);
+        $('removedCount').textContent = `${state.removedRows.length} removidos`;
+        $('remainingCount').textContent = `${state.remainingRows.length} restantes`;
+        $('metaInfo').textContent = `Saída: ${state.outputFileName} | Aba: ${state.outputSheetName}`;
+        setStatus('statusMsg', 'Processamento concluído com sucesso.', 'success');
+        $('btnDownload').disabled = false;
+      } catch (err) {
+        setStatus('statusMsg', `Erro: ${err.message || err}`, 'error');
+      } finally {
+        $('btnProcessar').classList.remove('btn-loading');
+        $('btnProcessar').disabled = !(state.file1 && state.file2);
+      }
+    }
+
+    async function tratarBaseDisparo() {
+      if (!state.baseFile) return;
+      setStatus('statusBaseMsg', 'Lendo base do disparo...');
+      $('btnTratarBase').classList.add('btn-loading');
+      $('btnTratarBase').disabled = true;
+      try {
+        const p = await readExcelFile(state.baseFile);
+        state.baseRows = mapearColunasComSinonimos(p.rows, [
+          { canonica: "Telefone", obrigatoria: true, padroes: ["telefone", "fone", "celular", "whatsapp", "contato"] },
+        ], "base do disparo");
+        const nome = removeExtensao(state.baseFile.name);
+        state.baseOutputFileName = `${nome} tratada.xlsx`;
+        state.baseOutputSheetName = nomeAbaExcel(`${nome} tratada`);
+        const r = processarTratamentoBase(state.baseRows);
+        state.baseRemovedRows = r.removidos;
+        state.baseRemainingRows = r.restantes;
+        animateCount($('statBaseTotal'), r.stats.total);
+        animateCount($('statDuplicados'), r.stats.duplicados);
+        animateCount($('statInvalidos'), r.stats.invalidos);
+        animateCount($('statBaseRestantes'), r.stats.restantes);
+        $('baseRemovedCount').textContent = `${r.removidos.length} removidos`;
+        $('baseRemainingCount').textContent = `${r.restantes.length} restantes`;
+        $('metaTratamentoInfo').textContent = `Saída: ${state.baseOutputFileName} | Aba: ${state.baseOutputSheetName}`;
+        renderTabela('baseRemovedTable', state.baseRemovedRows);
+        renderTabela('baseRemainingTable', state.baseRemainingRows);
+        setStatus('statusBaseMsg', 'Tratamento concluído com sucesso.', 'success');
+        $('btnDownloadBaseTratada').disabled = false;
+      } catch (err) {
+        setStatus('statusBaseMsg', `Erro: ${err.message || err}`, 'error');
+      } finally {
+        $('btnTratarBase').classList.remove('btn-loading');
+        $('btnTratarBase').disabled = !state.baseFile;
+      }
+    }
+
+    async function processarConversaoVcf() {
+      if (!state.vcfFile) return;
+      setStatus('statusVcfMsg', 'Lendo planilha...');
+      $('btnConverterVcf').classList.add('btn-loading');
+      $('btnConverterVcf').disabled = true;
+      try {
+        const p = await readExcelFile(state.vcfFile);
+        state.vcfRows = mapearColunasComSinonimos(p.rows, [
+          { canonica: "Nome", obrigatoria: false, padroes: ["nome", "cliente", "contato nome"] },
+          { canonica: "Telefone", obrigatoria: false, padroes: ["telefone", "fone", "celular", "whatsapp", "contato"] },
+          { canonica: "country code", obrigatoria: false, padroes: ["country code", "countrycode", "ddi", "codigo pais", "codigopais"] },
+          { canonica: "E-mail", obrigatoria: false, padroes: ["e-mail", "email", "mail"] },
+        ], "planilha VCF");
+        const contatos = [];
+        let ignorados = 0;
+        for (let i = 0; i < state.vcfRows.length; i++) {
+          const c = mapearContatoVcf(state.vcfRows[i], i + 1);
+          if (!c) { ignorados++; continue; }
+          contatos.push(c);
+        }
+        state.vcfContacts = contatos;
+        state.vcfContent = montarVcf(contatos);
+        state.vcfOutputFileName = `${removeExtensao(state.vcfFile.name)}.vcf`;
+        animateCount($('statVcfTotal'), state.vcfRows.length);
+        animateCount($('statVcfGerados'), contatos.length);
+        animateCount($('statVcfIgnorados'), ignorados);
+        $('metaVcfInfo').textContent = `Saída: ${state.vcfOutputFileName}`;
+        setStatus('statusVcfMsg', 'Conversão concluída.', 'success');
+        $('btnDownloadVcf').disabled = !contatos.length;
+      } catch (err) {
+        setStatus('statusVcfMsg', `Erro: ${err.message || err}`, 'error');
+      } finally {
+        $('btnConverterVcf').classList.remove('btn-loading');
+        $('btnConverterVcf').disabled = !state.vcfFile;
+      }
+    }
+
+    /* download helpers */
+    function baixarResultado() {
+      if (!state.remainingRows.length) return;
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.remainingRows), state.outputSheetName || "Resultado");
+      XLSX.writeFile(wb, state.outputFileName || "redisparado.xlsx");
+    }
+
+    function baixarBaseTratada() {
+      if (!state.baseRemainingRows.length) return;
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.baseRemainingRows, { defval: "" }), state.baseOutputSheetName || "BaseTratada");
+      XLSX.writeFile(wb, state.baseOutputFileName || "base tratada.xlsx");
+    }
+
+    function baixarVcf() {
+      if (!state.vcfContent) return;
+      const a = Object.assign(document.createElement('a'), {
+        href: URL.createObjectURL(new Blob([state.vcfContent], { type: "text/vcard;charset=utf-8" })),
+        download: state.vcfOutputFileName || "contatos.vcf"
+      });
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+
+    /* core logic */
+    function compararPlanilhas(rows1, rows2, novoNomeBase) {
+      const stats = { enviados: 0, recebidos: 0, erros: 0 };
+      const sucessoPorContato = new Set();
+      const erroPorContato = new Set();
+      const statusPorContato = new Map();
+
+      for (const row of rows2) {
+        const s = normalizarStatus(row["Status de Mensagem"]);
+        const k = chaveComparacao(row["Contato"]);
+        if (!s) continue;
+        if (STATUS_ENVIADO.has(s)) stats.enviados++;
+        else if (STATUS_RECEBIDO.has(s)) stats.recebidos++;
+        else stats.erros++;
+        if (!k) continue;
+        const lista = statusPorContato.get(k) || [];
+        lista.push(s);
+        statusPorContato.set(k, lista);
+        if (STATUS_SUCESSO.has(s)) sucessoPorContato.add(k);
+        else erroPorContato.add(k);
+      }
+
+      const removidos = [], restantes = [];
+      for (const row of rows1) {
+        const k = chaveComparacao(row["Telefone"]);
+        const base = estruturarLinhaSaida(row, novoNomeBase);
+        const statusEnc = (statusPorContato.get(k) || []).join(", ");
+        if (!k || !statusPorContato.has(k)) {
+          removidos.push({ ...base, "_motivo_remocao": "Contato sem status no relatório", "_status_encontrados": statusEnc });
+        } else if (sucessoPorContato.has(k)) {
+          removidos.push({ ...base, "_motivo_remocao": "Enviado/Entregue", "_status_encontrados": statusEnc });
+        } else if (erroPorContato.has(k)) {
+          restantes.push(base);
+        } else {
+          removidos.push({ ...base, "_motivo_remocao": "Sem status de erro", "_status_encontrados": statusEnc });
+        }
+      }
+      return { removidos, restantes, stats };
+    }
+
+    function processarTratamentoBase(rows) {
+      const removidos = [], restantes = [];
+      const vistos = new Set();
+      const stats = { total: rows.length, duplicados: 0, invalidos: 0, restantes: 0 };
+
+      for (const row of rows) {
+        const telNorm = normalizarTelefone(row["Telefone"]);
+        const motivo = classificarTelefoneInvalido(telNorm);
+        if (motivo) { stats.invalidos++; removidos.push({ ...row, "_motivo_remocao": motivo, "_telefone_normalizado": telNorm }); continue; }
+        const chave = chaveComparacao(row["Telefone"]);
+        if (!chave) { stats.invalidos++; removidos.push({ ...row, "_motivo_remocao": "Telefone sem chave", "_telefone_normalizado": telNorm }); continue; }
+        if (vistos.has(chave)) { stats.duplicados++; removidos.push({ ...row, "_motivo_remocao": "Duplicado", "_telefone_normalizado": telNorm }); continue; }
+        vistos.add(chave);
+        restantes.push(row);
+      }
+      stats.restantes = restantes.length;
+      return { removidos, restantes, stats };
+    }
+
+    function classificarTelefoneInvalido(t) {
+      if (!t) return "Telefone vazio";
+      if (/^55\d{2}$/.test(t)) return "Incompleto (55+DDD)";
+      if (t.length < 10) return "Telefone incompleto";
+      return "";
+    }
+
+    function estruturarLinhaSaida(row, novoNomeBase) {
+      const out = {};
+      for (const col of COLUNAS_SAIDA) out[col] = row[col] ?? "";
+      out["Tags"] = novoNomeBase;
+      return out;
+    }
+
+    function normalizarTelefone(v) { return v == null ? "" : String(v).replace(/\D+/g, ""); }
+    function chaveComparacao(v) { const t = normalizarTelefone(v); return t.length >= 11 ? t.slice(-11) : t; }
+    function normalizarStatus(v) { return String(v ?? "").trim().toLowerCase(); }
+
+    function mapearContatoVcf(row, idx) {
+      const nome = String(row["Nome"] ?? "").trim();
+      const email = String(row["E-mail"] ?? "").trim();
+      const tBase = normalizarTelefone(row["Telefone"]);
+      const cc = normalizarTelefone(row["country code"]);
+      let tel = tBase;
+      if (cc && tBase && !tBase.startsWith(cc)) tel = `${cc}${tBase}`;
+      if (!tel && !email) return null;
+      return { nome: nome || `Contato ${idx}`, telefone: tel ? `+${tel}` : "", email };
+    }
+
+    function escapeVcf(v) { return String(v ?? "").replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/;/g,"\\;").replace(/,/g,"\\,"); }
+
+    function montarVcf(contatos) {
+      return contatos.map(c => {
+        const l = ["BEGIN:VCARD","VERSION:3.0",`FN:${escapeVcf(c.nome)}`];
+        if (c.telefone) l.push(`TEL;TYPE=CELL:${escapeVcf(c.telefone)}`);
+        if (c.email) l.push(`EMAIL;TYPE=INTERNET:${escapeVcf(c.email)}`);
+        l.push("END:VCARD");
+        return l.join("\r\n");
+      }).join("\r\n");
+    }
+
+    function obterChipInformado() { return String($("chipInput").value || "").trim(); }
+    function montarNomeRedisparo(base, chip) { return chip ? `${base} - ${chip}` : `${base} redisparado`; }
+
+    function atualizarPreviewSaidaRedisparo() {
+      if (!state.file1) return;
+      const nome = montarNomeRedisparo(removeExtensao(state.file1.name), obterChipInformado());
+      $("metaInfo").textContent = `Prévia: ${nome}.xlsx | Aba: ${nomeAbaExcel(nome)}`;
+    }
+
+    function nomeAbaExcel(t) { return String(t || "Resultado").replace(/[:\\/*\[\]]/g,"_").trim().slice(0,31) || "Resultado"; }
+    function removeExtensao(n) { return n.replace(/\.[^.]+$/, ""); }
+
+    function validarColunasObrigatorias(rows, cols, tipo) {
+      const colunas = rows[0] ? Object.keys(rows[0]) : [];
+      for (const col of cols) {
+        if (!colunas.includes(col)) throw new Error(`Coluna '${col}' não encontrada na ${tipo} planilha.`);
+      }
+    }
+
+    function normalizarNomeColuna(nome) {
+      return String(nome ?? "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+    }
+
+    function encontrarMelhorColuna(headers, padroes) {
+      const alvos = (padroes || []).map(normalizarNomeColuna);
+      let melhorHeader = "";
+      let melhorScore = -1;
+
+      headers.forEach((header) => {
+        const norm = normalizarNomeColuna(header);
+        let score = -1;
+        alvos.forEach((alvo) => {
+          if (!alvo) return;
+          if (norm === alvo) score = Math.max(score, 300);
+          else if (norm.startsWith(alvo) || alvo.startsWith(norm)) score = Math.max(score, 200);
+          else if (norm.includes(alvo) || alvo.includes(norm)) score = Math.max(score, 100);
+        });
+        if (score > melhorScore) {
+          melhorScore = score;
+          melhorHeader = header;
+        }
+      });
+
+      return melhorScore >= 0 ? melhorHeader : "";
+    }
+
+    function mapearColunasComSinonimos(rows, definicoes, tipo) {
+      if (!rows.length) {
+        const obrigatorias = definicoes.filter((d) => d.obrigatoria).map((d) => d.canonica);
+        if (obrigatorias.length) {
+          throw new Error(`Planilha ${tipo} sem dados para localizar colunas obrigatorias: ${obrigatorias.join(", ")}.`);
+        }
+        return rows;
+      }
+
+      const headers = Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
+      const mapa = {};
+      definicoes.forEach((def) => {
+        mapa[def.canonica] = encontrarMelhorColuna(headers, def.padroes || [def.canonica]);
+      });
+
+      const faltando = definicoes
+        .filter((d) => d.obrigatoria && !mapa[d.canonica])
+        .map((d) => d.canonica);
+      if (faltando.length) {
+        throw new Error(`Nao foi possivel localizar coluna(s) obrigatoria(s) na ${tipo} planilha: ${faltando.join(", ")}.`);
+      }
+
+      return rows.map((row) => {
+        const out = { ...row };
+        definicoes.forEach((def) => {
+          const origem = mapa[def.canonica];
+          out[def.canonica] = origem ? (row[origem] ?? "") : (out[def.canonica] ?? "");
+        });
+        return out;
+      });
+    }
+
+    function renderTabela(tableId, rows) {
+      const table = $(tableId);
+      const thead = table.querySelector("thead");
+      const tbody = table.querySelector("tbody");
+      thead.innerHTML = ""; tbody.innerHTML = "";
+      if (!rows.length) {
+        thead.innerHTML = "<tr><th>Sem dados</th></tr>";
+        tbody.innerHTML = "<tr><td>Nenhum registro para exibir.</td></tr>";
+        return;
+      }
+      const headers = Object.keys(rows[0]);
+      const headTr = document.createElement("tr");
+      headers.forEach(h => { const th = document.createElement("th"); th.textContent = h; headTr.appendChild(th); });
+      thead.appendChild(headTr);
+      const frag = document.createDocumentFragment();
+      rows.forEach(row => {
+        const tr = document.createElement("tr");
+        headers.forEach(h => { const td = document.createElement("td"); td.textContent = row[h] ?? ""; tr.appendChild(td); });
+        frag.appendChild(tr);
+      });
+      tbody.appendChild(frag);
+    }
+
+    function gerarNomeUnicoCabecalho(headers, base) {
+      const nomeBase = String(base || "Nova Coluna").trim() || "Nova Coluna";
+      let nome = nomeBase;
+      let idx = 2;
+      const usados = new Set(headers);
+      while (usados.has(nome)) {
+        nome = `${nomeBase} (${idx})`;
+        idx++;
+      }
+      return nome;
+    }
+
+    function gerarNomeUnicoPlanilha(base) {
+      const nomeBase = String(base || `Planilha ${state.listSheetCounter}`).trim() || `Planilha ${state.listSheetCounter}`;
+      let nome = nomeBase;
+      let idx = 2;
+      const usados = new Set(state.listSheets.map(s => s.name));
+      while (usados.has(nome)) {
+        nome = `${nomeBase} (${idx})`;
+        idx++;
+      }
+      return nome;
+    }
+
+    function getPlanilhaAtiva() {
+      return state.listSheets.find(s => s.id === state.activeListSheetId) || null;
+    }
+
+    async function handleListFilePick(e) {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+      setStatus('statusListMsg', 'Carregando planilhas...');
+
+      try {
+        for (const file of files) {
+          const data = await readWorkbookFile(file);
+          for (const aba of data.workbook.SheetNames) {
+            const sheet = data.workbook.Sheets[aba];
+            const rowsRaw = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
+            const headersSet = new Set();
+            rowsRaw.forEach(row => Object.keys(row).forEach(h => headersSet.add(h)));
+            const headers = Array.from(headersSet);
+            const rows = rowsRaw.map(row => {
+              const out = {};
+              headers.forEach(h => out[h] = row[h] ?? "");
+              return out;
+            });
+
+            const id = `sheet_${state.listSheetCounter++}`;
+            const name = gerarNomeUnicoPlanilha(`${removeExtensao(file.name)} - ${aba}`);
+            state.listSheets.push({ id, sourceFile: file.name, name, headers, rows });
+            state.activeListSheetId = id;
+          }
+        }
+
+        $('listFilesInfo').textContent = `${state.listSheets.length} planilha(s) carregada(s)`;
+        $('listFilesInfo').classList.remove('empty');
+        $('dropZoneListas').classList.add('has-file');
+        atualizarEditorListas();
+        setStatus('statusListMsg', 'Planilhas carregadas. Edite cabecalhos, posicoes e dados.', 'success');
+      } catch (err) {
+        setStatus('statusListMsg', `Erro ao carregar: ${err.message || err}`, 'error');
+      } finally {
+        e.target.value = "";
+      }
+    }
+
+    function atualizarEditorListas() {
+      const picker = $('sheetPicker');
+      picker.innerHTML = '';
+
+      if (!state.listSheets.length) {
+        picker.disabled = true;
+        picker.innerHTML = '<option value="">Nenhuma planilha carregada</option>';
+        $('sheetNameInput').value = '';
+        $('btnDownloadActiveSheet').disabled = true;
+        $('btnDownloadAllSheets').disabled = true;
+        $('btnApplyStructureAll').disabled = true;
+        $('btnMergeAllData').disabled = true;
+        $('listHeaderCount').textContent = '0 cabecalhos';
+        $('listRowCount').textContent = '0 linhas';
+        renderHeaderEditor(null);
+        renderListTable(null);
+        return;
+      }
+
+      if (!getPlanilhaAtiva()) {
+        state.activeListSheetId = state.listSheets[0].id;
+      }
+
+      state.listSheets.forEach(sheet => {
+        const opt = document.createElement('option');
+        opt.value = sheet.id;
+        opt.textContent = `${sheet.name} (${sheet.rows.length} linhas)`;
+        if (sheet.id === state.activeListSheetId) opt.selected = true;
+        picker.appendChild(opt);
+      });
+
+      const active = getPlanilhaAtiva();
+      picker.disabled = false;
+      picker.value = active.id;
+      $('sheetNameInput').value = active.name;
+      $('btnDownloadActiveSheet').disabled = false;
+      $('btnDownloadAllSheets').disabled = false;
+      $('btnApplyStructureAll').disabled = state.listSheets.length < 2;
+      $('btnMergeAllData').disabled = state.listSheets.length < 2;
+      $('listHeaderCount').textContent = `${active.headers.length} cabecalhos`;
+      $('listRowCount').textContent = `${active.rows.length} linhas`;
+      renderHeaderEditor(active);
+      renderListTable(active);
+    }
+
+    function handleSheetSelection(e) {
+      state.activeListSheetId = e.target.value;
+      atualizarEditorListas();
+    }
+
+    function handleSheetRename(e) {
+      const sheet = getPlanilhaAtiva();
+      if (!sheet) return;
+      const digitado = String(e.target.value || "").trim();
+      sheet.name = digitado || "Planilha";
+      atualizarEditorListas();
+    }
+
+    function renderHeaderEditor(sheet) {
+      const box = $('headerEditorBox');
+      box.innerHTML = '';
+
+      if (!sheet) {
+        box.textContent = 'Nenhuma planilha ativa.';
+        return;
+      }
+
+      if (!sheet.headers.length) {
+        box.textContent = 'Sem cabecalhos. Adicione um novo cabecalho.';
+        return;
+      }
+
+      const frag = document.createDocumentFragment();
+      sheet.headers.forEach((header, index) => {
+        const item = document.createElement('div');
+        item.className = 'header-item';
+        item.innerHTML = `
+          <input class="text-input" data-action="rename-header" data-index="${index}" value="${escapeHtml(header)}" />
+          <div class="header-actions">
+            <button class="btn mini" data-action="move-left" data-index="${index}" ${index === 0 ? 'disabled' : ''}>&lt;</button>
+            <button class="btn mini" data-action="move-right" data-index="${index}" ${index === sheet.headers.length - 1 ? 'disabled' : ''}>&gt;</button>
+            <button class="btn mini" data-action="remove-header" data-index="${index}">X</button>
+          </div>
+        `;
+        frag.appendChild(item);
+      });
+      box.appendChild(frag);
+    }
+
+    function handleHeaderActions(e) {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const sheet = getPlanilhaAtiva();
+      if (!sheet) return;
+      const idx = Number(btn.dataset.index);
+      if (Number.isNaN(idx)) return;
+
+      if (btn.dataset.action === 'move-left' && idx > 0) {
+        const tmp = sheet.headers[idx - 1];
+        sheet.headers[idx - 1] = sheet.headers[idx];
+        sheet.headers[idx] = tmp;
+      } else if (btn.dataset.action === 'move-right' && idx < sheet.headers.length - 1) {
+        const tmp = sheet.headers[idx + 1];
+        sheet.headers[idx + 1] = sheet.headers[idx];
+        sheet.headers[idx] = tmp;
+      } else if (btn.dataset.action === 'remove-header') {
+        const removed = sheet.headers.splice(idx, 1)[0];
+        sheet.rows.forEach(r => delete r[removed]);
+      }
+
+      atualizarEditorListas();
+    }
+
+    function handleHeaderRename(e) {
+      const input = e.target.closest('input[data-action="rename-header"]');
+      if (!input) return;
+      const sheet = getPlanilhaAtiva();
+      if (!sheet) return;
+
+      const idx = Number(input.dataset.index);
+      if (Number.isNaN(idx) || idx < 0 || idx >= sheet.headers.length) return;
+      const antigo = sheet.headers[idx];
+      const novo = String(input.value || "").trim();
+      if (!novo || novo === antigo) return;
+
+      const repetido = sheet.headers.some((h, i) => i !== idx && h === novo);
+      if (repetido) {
+        input.value = antigo;
+        setStatus('statusListMsg', `Cabecalho "${novo}" ja existe.`, 'error');
+        return;
+      }
+
+      sheet.headers[idx] = novo;
+      sheet.rows.forEach(row => {
+        row[novo] = row[antigo] ?? "";
+        delete row[antigo];
+      });
+      atualizarEditorListas();
+    }
+
+    function handleAddHeader() {
+      const sheet = getPlanilhaAtiva();
+      if (!sheet) {
+        setStatus('statusListMsg', 'Carregue uma planilha antes de adicionar cabecalho.', 'error');
+        return;
+      }
+
+      const base = String($('newHeaderInput').value || "").trim() || "Nova Coluna";
+      const header = gerarNomeUnicoCabecalho(sheet.headers, base);
+      sheet.headers.push(header);
+      sheet.rows.forEach(row => row[header] = "");
+      $('newHeaderInput').value = "";
+      atualizarEditorListas();
+    }
+
+    function criarPlanilhaVazia() {
+      const id = `sheet_${state.listSheetCounter++}`;
+      const name = gerarNomeUnicoPlanilha(`Planilha ${state.listSheetCounter - 1}`);
+      state.listSheets.push({ id, sourceFile: "manual", name, headers: [], rows: [] });
+      state.activeListSheetId = id;
+      atualizarEditorListas();
+      setStatus('statusListMsg', 'Planilha vazia criada. Adicione cabecalhos e linhas.', 'success');
+    }
+
+    function aplicarEstruturaPrimeiraEmTodas() {
+      if (state.listSheets.length < 2) {
+        setStatus('statusListMsg', 'Carregue pelo menos duas planilhas para aplicar estrutura.', 'error');
+        return;
+      }
+
+      const referencia = state.listSheets[0];
+      const headersRef = [...referencia.headers];
+      if (!headersRef.length) {
+        setStatus('statusListMsg', 'A primeira planilha nao possui cabecalhos para servir de referencia.', 'error');
+        return;
+      }
+
+      for (let i = 1; i < state.listSheets.length; i++) {
+        const sheet = state.listSheets[i];
+        const headersOriginais = [...sheet.headers];
+
+        sheet.rows = sheet.rows.map((row) => {
+          const nova = {};
+          headersRef.forEach((headerRef, idx) => {
+            const headerMesmoNome = Object.prototype.hasOwnProperty.call(row, headerRef) ? headerRef : "";
+            const headerPorPosicao = headersOriginais[idx] || "";
+            if (headerMesmoNome) {
+              nova[headerRef] = row[headerMesmoNome] ?? "";
+            } else if (headerPorPosicao && Object.prototype.hasOwnProperty.call(row, headerPorPosicao)) {
+              nova[headerRef] = row[headerPorPosicao] ?? "";
+            } else {
+              nova[headerRef] = "";
+            }
+          });
+          return nova;
+        });
+
+        sheet.headers = [...headersRef];
+      }
+
+      atualizarEditorListas();
+      setStatus('statusListMsg', 'Estrutura da primeira planilha aplicada em todas as outras.', 'success');
+    }
+
+    function juntarDadosDeTodasPlanilhas() {
+      if (state.listSheets.length < 2) {
+        setStatus('statusListMsg', 'Carregue pelo menos duas planilhas para juntar os dados.', 'error');
+        return;
+      }
+
+      const referencia = state.listSheets[0];
+      const headersRef = referencia.headers.length ? [...referencia.headers] : [];
+      const headersUsados = headersRef.length ? headersRef : Array.from(new Set(state.listSheets.flatMap(s => s.headers)));
+
+      if (!headersUsados.length) {
+        setStatus('statusListMsg', 'Nao ha cabecalhos para juntar os dados.', 'error');
+        return;
+      }
+
+      const linhasUnificadas = [];
+      state.listSheets.forEach((sheet) => {
+        sheet.rows.forEach((row) => {
+          const nova = {};
+          headersUsados.forEach((h) => {
+            nova[h] = row[h] ?? "";
+          });
+          linhasUnificadas.push(nova);
+        });
+      });
+
+      const id = `sheet_${state.listSheetCounter++}`;
+      const name = gerarNomeUnicoPlanilha("Dados Unificados");
+      state.listSheets.push({
+        id,
+        sourceFile: "merge",
+        name,
+        headers: [...headersUsados],
+        rows: linhasUnificadas,
+      });
+      state.activeListSheetId = id;
+      atualizarEditorListas();
+      setStatus('statusListMsg', `Dados unidos em "${name}" com ${linhasUnificadas.length} linha(s).`, 'success');
+    }
+
+    function renderListTable(sheet) {
+      const table = $('listEditorTable');
+      const thead = table.querySelector('thead');
+      const tbody = table.querySelector('tbody');
+      thead.innerHTML = '';
+      tbody.innerHTML = '';
+
+      if (!sheet) {
+        thead.innerHTML = '<tr><th>Sem dados</th></tr>';
+        tbody.innerHTML = '<tr><td>Nenhuma planilha ativa.</td></tr>';
+        return;
+      }
+
+      if (!sheet.headers.length) {
+        thead.innerHTML = '<tr><th>Sem cabecalhos</th></tr>';
+        tbody.innerHTML = '<tr><td>Adicione cabecalhos para exibir os dados.</td></tr>';
+        return;
+      }
+
+      const headTr = document.createElement('tr');
+      sheet.headers.forEach(h => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        headTr.appendChild(th);
+      });
+      thead.appendChild(headTr);
+
+      if (!sheet.rows.length) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = sheet.headers.length;
+        td.textContent = 'Sem linhas.';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }
+
+      const frag = document.createDocumentFragment();
+      sheet.rows.forEach((row, rowIndex) => {
+        const tr = document.createElement('tr');
+        sheet.headers.forEach(header => {
+          const td = document.createElement('td');
+          td.className = 'editable-cell';
+          td.contentEditable = 'true';
+          td.dataset.row = String(rowIndex);
+          td.dataset.header = header;
+          td.textContent = row[header] ?? "";
+          tr.appendChild(td);
+        });
+        frag.appendChild(tr);
+      });
+      tbody.appendChild(frag);
+    }
+
+    function handleCellInput(e) {
+      const td = e.target.closest('td.editable-cell');
+      if (!td) return;
+      const sheet = getPlanilhaAtiva();
+      if (!sheet) return;
+      const rowIndex = Number(td.dataset.row);
+      const header = td.dataset.header;
+      if (Number.isNaN(rowIndex) || !header || !sheet.rows[rowIndex]) return;
+      sheet.rows[rowIndex][header] = td.textContent ?? "";
+    }
+
+    function montarRowsParaExportacao(sheet) {
+      return sheet.rows.map(row => {
+        const out = {};
+        sheet.headers.forEach(h => out[h] = row[h] ?? "");
+        return out;
+      });
+    }
+
+    function baixarPlanilhaAtiva() {
+      const sheet = getPlanilhaAtiva();
+      if (!sheet) return;
+      const wb = XLSX.utils.book_new();
+      const rows = montarRowsParaExportacao(sheet);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows, { defval: "" }), nomeAbaExcel(sheet.name || "Planilha"));
+      XLSX.writeFile(wb, `${sheet.name || "planilha"}.xlsx`);
+    }
+
+    function baixarTodasPlanilhas() {
+      if (!state.listSheets.length) return;
+      const wb = XLSX.utils.book_new();
+      state.listSheets.forEach((sheet, i) => {
+        const rows = montarRowsParaExportacao(sheet);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows, { defval: "" }), nomeAbaExcel(sheet.name || `Planilha ${i + 1}`));
+      });
+      XLSX.writeFile(wb, "listas_editadas.xlsx");
+    }
+
+    function escapeHtml(v) {
+      return String(v ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    async function readExcelFile(file) {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array" });
+      const sn = wb.SheetNames[0];
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { defval: "", raw: false });
+      return { workbook: wb, sheetName: sn, rows };
+    }
+
+    async function readWorkbookFile(file) {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array" });
+      return { workbook: wb };
+    }
+
+    atualizarEditorListas();
+    inicializarTema();
+  </script>
+</body>
+</html>
