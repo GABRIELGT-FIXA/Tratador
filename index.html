@@ -208,7 +208,17 @@
               <input id="baseFile" type="file" accept=".xlsx,.xls" class="hidden" />
               <div id="baseFileName" class="file-name empty">nenhum arquivo selecionado</div>
             </div>
-            <p class="file-help">Remove contatos duplicados e números incompletos/vazios automaticamente.</p>
+            <p class="file-help">Colunas esperadas: <strong>Nome, Telefone, CNPJ</strong> e opcionalmente <strong>Responsavel</strong>. Remove duplicados, formata telefone e CNPJ automaticamente.</p>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">Modo de Disparo</span>
+            <label class="checkbox-label" for="chkCarterizado">
+              <input type="checkbox" id="chkCarterizado" />
+              Disparo Carterizado
+              <span class="badge-tag">coluna <code>responsavel</code></span>
+            </label>
+            <p class="file-help" id="helpCarterizado" style="display:none;">No modo carterizado a coluna <strong>responsavel</strong> é obrigatória — registros sem ela serão apontados como erro.</p>
           </div>
 
           <div class="control-group">
@@ -232,18 +242,24 @@
         <div class="stats">
           <div class="stat"><div class="stat-k">Total da Base</div><div class="stat-v" id="statBaseTotal">0</div></div>
           <div class="stat"><div class="stat-k">Duplicados Removidos</div><div class="stat-v warn" id="statDuplicados">0</div></div>
-          <div class="stat"><div class="stat-k">Números Inválidos</div><div class="stat-v bad" id="statInvalidos">0</div></div>
-          <div class="stat"><div class="stat-k">Restantes Válidos</div><div class="stat-v ok" id="statBaseRestantes">0</div></div>
+          <div class="stat"><div class="stat-k">Inválidos / Erros</div><div class="stat-v bad" id="statInvalidos">0</div></div>
+          <div class="stat"><div class="stat-k">Corrigidos Auto.</div><div class="stat-v warn" id="statCorrigidos">0</div></div>
+          <div class="stat"><div class="stat-k">Prontos para Envio</div><div class="stat-v ok" id="statBaseRestantes">0</div></div>
         </div>
 
-        <div class="meta-info" id="metaTratamentoInfo">Critérios: telefone vazio, incompleto (55+DDD) e duplicados normalizados.</div>
+        <div id="avisoRevisao" class="aviso-banner hidden">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span id="avisoRevisaoMsg"></span>
+        </div>
+
+        <div class="meta-info" id="metaTratamentoInfo">Telefone → DDI+DDD+número · cabeçalhos minúsculos sem acento · CNPJ com 14 dígitos · duplicados removidos.</div>
       </div>
 
       <div class="grid2">
         <div class="card">
           <div class="panel-head">
-            <h2>Removidos (Tratamento)</h2>
-            <span class="count-badge" id="baseRemovedCount">0 registros</span>
+            <h2>Removidos</h2>
+            <span class="count-badge bad-badge" id="baseRemovedCount">0 registros</span>
           </div>
           <div class="table-search-wrap">
             <input class="table-search" type="search" placeholder="Filtrar registros..." />
@@ -262,95 +278,6 @@
           </div>
           <div class="table-wrap">
             <table id="baseRemainingTable"><thead></thead><tbody></tbody></table>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===== SUBTÍTULO: FORMATAR PARA DISPARO ===== -->
-      <div class="section-divider">
-        <h2>Formatar para <span>Disparo</span></h2>
-        <div class="section-divider-line"></div>
-      </div>
-
-      <div class="card">
-
-        <div class="controls">
-          <div class="control-group" style="grid-column: span 2;">
-            <span class="control-label">Planilha para Formatar</span>
-            <div class="file-drop-zone" id="dropZoneCsvFormat">
-              <button id="btnCsvFormatFile" class="btn" style="width:100%;">Selecionar planilha</button>
-              <input id="csvFormatFileInput" type="file" accept=".xlsx,.xls" class="hidden" />
-              <div id="csvFormatFileName" class="file-name empty">nenhum arquivo selecionado</div>
-            </div>
-            <p class="file-help">Colunas esperadas: <strong>Nome, Telefone, CNPJ</strong> e opcionalmente <strong>Responsavel</strong>. Todos os cabeçalhos serão normalizados.</p>
-          </div>
-
-          <div class="control-group">
-            <span class="control-label">Modo de Disparo</span>
-            <label class="checkbox-label" for="chkCarterizado">
-              <input type="checkbox" id="chkCarterizado" />
-              Disparo Carterizado
-              <span class="badge-tag">coluna <code>responsavel</code></span>
-            </label>
-            <p class="file-help" id="helpCarterizado" style="display:none;">No modo carterizado a coluna <strong>responsavel</strong> é obrigatória — registros sem ela serão apontados como erro.</p>
-          </div>
-
-          <div class="control-group">
-            <span class="control-label">Ações</span>
-            <button id="btnFormatarCsv" class="btn primary" disabled>
-              <span class="btn-text">Formatar e Analisar</span>
-            </button>
-            <button id="btnDownloadCsvFormatado" class="btn" disabled style="margin-top:8px;">
-              <span class="btn-text">Baixar Formatado (.csv)</span>
-            </button>
-            <button id="btnDownloadXlsxFormatado" class="btn" disabled style="margin-top:8px;">
-              <span class="btn-text">Baixar Formatado (.xlsx)</span>
-            </button>
-            <button id="btnClearCsvFormat" class="btn secondary" style="margin-top:8px;">
-              <span class="btn-text">Limpar</span>
-            </button>
-            <div id="statusCsvFormatMsg" class="status-bar">Selecione uma planilha para formatar.</div>
-          </div>
-        </div>
-
-        <div class="stats">
-          <div class="stat"><div class="stat-k">Total de Registros</div><div class="stat-v" id="statCsvTotal">0</div></div>
-          <div class="stat"><div class="stat-k">Corrigidos Auto.</div><div class="stat-v warn" id="statCsvResolvidos">0</div></div>
-          <div class="stat"><div class="stat-k">Erros Não Resolvidos</div><div class="stat-v bad" id="statCsvErros">0</div></div>
-          <div class="stat"><div class="stat-k">Prontos para Envio</div><div class="stat-v ok" id="statCsvProntos">0</div></div>
-        </div>
-
-        <div id="avisoRevisao" class="aviso-banner hidden">
-          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <span id="avisoRevisaoMsg"></span>
-        </div>
-
-        <div class="meta-info" id="metaCsvFormatInfo">Formata: telefone → DDI+DDD+número (ex: 5521999999999) · cabeçalhos minúsculos sem acento · CNPJ com 14 dígitos.</div>
-      </div>
-
-      <div class="grid2" id="gridCsvFormat" style="margin-top:16px; display:none;">
-        <div class="card">
-          <div class="panel-head">
-            <h2>Erros Não Resolvidos</h2>
-            <span class="count-badge bad-badge" id="csvErrosCount">0 registros</span>
-          </div>
-          <div class="table-search-wrap">
-            <input class="table-search" type="search" placeholder="Filtrar registros..." />
-          </div>
-          <div class="table-wrap">
-            <table id="csvErrosTable"><thead></thead><tbody></tbody></table>
-          </div>
-        </div>
-        <div class="card">
-          <div class="panel-head">
-            <h2>Dados Formatados</h2>
-            <span class="count-badge" id="csvFormatadosCount">0 registros</span>
-          </div>
-          <div class="table-search-wrap">
-            <input class="table-search" type="search" placeholder="Filtrar registros..." />
-          </div>
-          <div class="table-wrap">
-            <table id="csvFormatadosTable"><thead></thead><tbody></tbody></table>
           </div>
         </div>
       </div>

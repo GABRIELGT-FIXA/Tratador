@@ -179,11 +179,6 @@ const state = {
   activeListSheetId: "",
   listSheetCounter: 1,
   comparadorChart: null,
-  csvFormatFile: null,
-  csvFormatRows: [],
-  csvFormatadoRows: [],
-  csvErrosRows: [],
-  csvFormatOutputFileName: '',
 };
 
 const $ = id => document.getElementById(id);
@@ -388,28 +383,6 @@ setupDropZone('dropZoneVcf', 'vcfFile', file => {
   ['statVcfTotal', 'statVcfGerados', 'statVcfIgnorados'].forEach(id => $(id).textContent = '0');
 });
 
-/* ===== CSV FORMAT FILE SETUP ===== */
-setupFilePick('btnCsvFormatFile', 'csvFormatFileInput', 'csvFormatFileName', 'dropZoneCsvFormat', file => {
-  state.csvFormatFile = file;
-  Object.assign(state, { csvFormatRows: [], csvFormatadoRows: [], csvErrosRows: [], csvFormatOutputFileName: '' });
-  setStatus('statusCsvFormatMsg', 'Planilha carregada. Clique em Formatar e Analisar.');
-  $('btnFormatarCsv').disabled = false;
-  $('btnDownloadCsvFormatado').disabled = true;
-  $('btnDownloadXlsxFormatado').disabled = true;
-  ['statCsvTotal','statCsvResolvidos','statCsvErros','statCsvProntos'].forEach(id => $(id).textContent = '0');
-});
-
-setupDropZone('dropZoneCsvFormat', 'csvFormatFileInput', file => {
-  state.csvFormatFile = file;
-  setFileUI('csvFormatFileName', 'dropZoneCsvFormat', file);
-  Object.assign(state, { csvFormatRows: [], csvFormatadoRows: [], csvErrosRows: [], csvFormatOutputFileName: '' });
-  setStatus('statusCsvFormatMsg', 'Planilha carregada. Clique em Formatar e Analisar.');
-  $('btnFormatarCsv').disabled = false;
-  $('btnDownloadCsvFormatado').disabled = true;
-  $('btnDownloadXlsxFormatado').disabled = true;
-  ['statCsvTotal','statCsvResolvidos','statCsvErros','statCsvProntos'].forEach(id => $(id).textContent = '0');
-});
-
 $('chkCarterizado').addEventListener('change', function () {
   $('helpCarterizado').style.display = this.checked ? '' : 'none';
 });
@@ -464,8 +437,9 @@ $('btnClearTratamento').addEventListener('click', () => {
   $('baseFileName').textContent = 'nenhum arquivo selecionado'; $('baseFileName').classList.add('empty');
   $('dropZoneBase').classList.remove('has-file');
   $('btnTratarBase').disabled = true;
-  $('btnDownloadBaseTratada').disabled = true;
-  ['statBaseTotal','statDuplicados','statInvalidos','statBaseRestantes'].forEach(id => $(id).textContent = '0');
+  $('btnDownloadBaseTratada').disabled = true; $('btnDownloadBaseCsv').disabled = true;
+  $('avisoRevisao').classList.add('hidden');
+  ['statBaseTotal','statDuplicados','statInvalidos','statCorrigidos','statBaseRestantes'].forEach(id => $(id).textContent = '0');
   setStatus('statusBaseMsg', 'Selecione a base para habilitar o tratamento.');
   $('metaTratamentoInfo').textContent = 'Critérios: telefone vazio, incompleto (55+DDD) e duplicados normalizados.';
   $('baseRemovedCount').textContent = '0 registros';
@@ -498,28 +472,6 @@ $('btnDownloadBaseCsv').addEventListener('click', baixarBaseTratadaCsv);
 $('btnConverterVcf').addEventListener('click', processarConversaoVcf);
 $('btnDownloadVcf').addEventListener('click', baixarVcf);
 $('btnLimparHistorico').addEventListener('click', limparHistorico);
-$('btnFormatarCsv').addEventListener('click', formatarParaCSV);
-$('btnDownloadCsvFormatado').addEventListener('click', () => {
-  if (!state.csvFormatadoRows.length) return;
-  downloadCsv(state.csvFormatadoRows, state.csvFormatOutputFileName || 'base_formatada.csv');
-  showToast('Download CSV iniciado!', 'success', 2500);
-});
-$('btnDownloadXlsxFormatado').addEventListener('click', baixarXlsxFormatado);
-$('btnClearCsvFormat').addEventListener('click', () => {
-  state.csvFormatFile = null;
-  Object.assign(state, { csvFormatRows: [], csvFormatadoRows: [], csvErrosRows: [], csvFormatOutputFileName: '' });
-  $('csvFormatFileName').textContent = 'nenhum arquivo selecionado';
-  $('csvFormatFileName').classList.add('empty');
-  $('dropZoneCsvFormat').classList.remove('has-file');
-  $('btnFormatarCsv').disabled = true;
-  $('btnDownloadCsvFormatado').disabled = true;
-  $('btnDownloadXlsxFormatado').disabled = true;
-  $('avisoRevisao').classList.add('hidden');
-  $('gridCsvFormat').style.display = 'none';
-  ['statCsvTotal','statCsvResolvidos','statCsvErros','statCsvProntos'].forEach(id => $(id).textContent = '0');
-  setStatus('statusCsvFormatMsg', 'Selecione uma planilha para formatar.');
-  showToast('Formatador CSV limpo.', 'info', 2000);
-});
 
 /* ===== PROCESSAR COMPARADOR ===== */
 async function processar() {
@@ -593,52 +545,146 @@ async function processar() {
   }
 }
 
-/* ===== PROCESSAR TRATAMENTO ===== */
+/* ===== PROCESSAR TRATAMENTO (unificado) ===== */
 async function tratarBaseDisparo() {
   if (!state.baseFile) return;
+  const isCarterizado = $('chkCarterizado').checked;
   setStatus('statusBaseMsg', 'Lendo base do disparo...');
   $('btnTratarBase').classList.add('btn-loading');
   $('btnTratarBase').disabled = true;
   progressStart();
 
   try {
-    const p = await readExcelFile(state.baseFile);
-    const rowsLimpas = limparColunasLixo(p.rows);
-    state.baseRows = mapearColunasComSinonimos(rowsLimpas, [
-      { canonica: "Telefone", obrigatoria: true, padroes: ["telefone","fone","celular","whatsapp","contato"] },
-    ], "base do disparo");
+    const p   = await readExcelFile(state.baseFile);
+    const raw = limparColunasLixo(p.rows);
+    if (!raw.length) throw new Error('Planilha vazia ou sem dados.');
 
     const nome = removeExtensao(state.baseFile.name);
     state.baseOutputFileName  = `${nome} tratada.xlsx`;
     state.baseOutputSheetName = nomeAbaExcel(`${nome} tratada`);
 
-    const r = processarTratamentoBase(state.baseRows);
-    state.baseRemovedRows   = r.removidos;
-    state.baseRemainingRows = r.restantes;
+    const removidos  = [];
+    const restantes  = [];
+    const vistos     = new Set();
+    const stats      = { total: raw.length, duplicados: 0, invalidos: 0, corrigidos: 0, prontos: 0 };
 
-    animateCount($('statBaseTotal'), r.stats.total);
-    animateCount($('statDuplicados'), r.stats.duplicados);
-    animateCount($('statInvalidos'), r.stats.invalidos);
-    animateCount($('statBaseRestantes'), r.stats.restantes);
+    for (let i = 0; i < raw.length; i++) {
+      const row    = raw[i];
+      const linha  = i + 2;
+      const norm   = {};
+      for (const k of Object.keys(row)) norm[_chaveNorm(k)] = row[k];
 
-    $('baseRemovedCount').textContent   = `${r.removidos.length} removidos`;
-    $('baseRemainingCount').textContent = `${r.restantes.length} restantes`;
-    $('metaTratamentoInfo').textContent = `Saída: ${state.baseOutputFileName} | Aba: ${state.baseOutputSheetName}`;
+      const correcoes = [];
+      const problemas = [];
 
-    renderTabela('baseRemovedTable', state.baseRemovedRows);
-    renderTabela('baseRemainingTable', state.baseRemainingRows);
-    setStatus('statusBaseMsg', 'Tratamento concluído com sucesso.', 'success');
-    $('btnDownloadBaseTratada').disabled = false;
-    $('btnDownloadBaseCsv').disabled = false;
+      // ── Nome ────────────────────────────────────────────
+      const out = {};
+      out['nome'] = String(norm['nome'] ?? norm['name'] ?? '').trim();
+
+      // ── Telefone ────────────────────────────────────────
+      const telRaw   = String(norm['telefone'] ?? norm['fone'] ?? norm['celular'] ?? norm['whatsapp'] ?? '').trim();
+      const telResult = _formatarTel(telRaw);
+      if (telResult.erro) {
+        stats.invalidos++;
+        removidos.push({ _linha: linha, _motivo: `Telefone inválido: ${telResult.erro}`, ...out, telefone: telRaw });
+        continue;
+      }
+      if (telResult.corrigido) correcoes.push(`telefone: "${telRaw}" → "${telResult.valor}"`);
+      out['telefone'] = telResult.valor;
+
+      // ── Deduplicação ────────────────────────────────────
+      const chave = out['telefone'].slice(-11);
+      if (vistos.has(chave)) {
+        stats.duplicados++;
+        removidos.push({ _linha: linha, _motivo: 'Duplicado', ...out });
+        continue;
+      }
+      vistos.add(chave);
+
+      // ── CNPJ ────────────────────────────────────────────
+      const cnpjRaw = String(norm['cnpj'] ?? '').trim();
+      if (cnpjRaw) {
+        const cnpjResult = _formatarCnpj(cnpjRaw);
+        if (cnpjResult.erro) {
+          problemas.push(`CNPJ: ${cnpjResult.erro}`);
+        } else {
+          if (cnpjResult.corrigido) correcoes.push(`cnpj: "${cnpjRaw}" → "${cnpjResult.valor}"`);
+          out['cnpj'] = cnpjResult.valor;
+        }
+      } else {
+        out['cnpj'] = '';
+      }
+
+      // ── Responsavel (carterizado) ────────────────────────
+      if (isCarterizado) {
+        const resp = String(norm['responsavel'] ?? norm['responsável'] ?? '').trim();
+        if (!resp) {
+          problemas.push('responsavel vazio (obrigatório no modo carterizado)');
+        } else {
+          out['responsavel'] = resp;
+        }
+      }
+
+      if (problemas.length) {
+        stats.invalidos++;
+        removidos.push({ _linha: linha, _motivo: problemas.join(' | '), ...out });
+        continue;
+      }
+
+      if (correcoes.length) {
+        stats.corrigidos++;
+        out['_correcoes'] = correcoes.join(' | ');
+      }
+
+      restantes.push(out);
+    }
+
+    stats.prontos         = restantes.length;
+    state.baseRemovedRows  = removidos;
+    state.baseRemainingRows = restantes;
+
+    animateCount($('statBaseTotal'),    stats.total);
+    animateCount($('statDuplicados'),   stats.duplicados);
+    animateCount($('statInvalidos'),    stats.invalidos);
+    animateCount($('statCorrigidos'),   stats.corrigidos);
+    animateCount($('statBaseRestantes'), stats.prontos);
+
+    $('baseRemovedCount').textContent   = `${removidos.length} registros`;
+    $('baseRemainingCount').textContent = `${restantes.length} registros`;
+    $('metaTratamentoInfo').textContent = `Saída: ${state.baseOutputFileName} · ${stats.prontos} prontos · ${stats.corrigidos} corrigidos · ${stats.invalidos} erros`;
+
+    // Aviso de revisão
+    const aviso = $('avisoRevisao');
+    if (stats.invalidos > 0) {
+      aviso.classList.remove('hidden', 'aviso-erro'); aviso.classList.add('aviso-erro');
+      $('avisoRevisaoMsg').textContent = `${stats.invalidos} registro(s) com problemas não resolvidos foram removidos. Revise antes do envio.`;
+    } else if (stats.corrigidos > 0) {
+      aviso.classList.remove('hidden', 'aviso-erro');
+      $('avisoRevisaoMsg').textContent = `${stats.corrigidos} registro(s) tiveram correções automáticas (coluna _correcoes). Revise antes do envio.`;
+    } else {
+      aviso.classList.add('hidden');
+    }
+
+    renderTabela('baseRemovedTable',    removidos);
+    renderTabela('baseRemainingTable',  restantes);
+
+    const ok = stats.invalidos === 0;
+    setStatus('statusBaseMsg',
+      ok ? `Tratamento concluído! ${stats.prontos} contatos prontos para envio.`
+         : `Concluído com ${stats.invalidos} erro(s). Verifique os removidos.`,
+      ok ? 'success' : 'error');
+
+    $('btnDownloadBaseTratada').disabled = (stats.prontos === 0);
+    $('btnDownloadBaseCsv').disabled     = (stats.prontos === 0);
 
     salvarHistorico({
       tipo: 'tratamento',
       arquivo: state.baseFile.name,
-      registros: r.stats.total,
-      extras: `${r.stats.restantes} válidos, ${r.stats.duplicados} duplicados`,
+      registros: stats.total,
+      extras: `${stats.prontos} prontos, ${stats.duplicados} duplicados, ${stats.corrigidos} corrigidos`,
     });
 
-    showToast(`Tratamento concluído! ${r.stats.restantes} contatos válidos.`, 'success');
+    showToast(`Tratamento concluído! ${stats.prontos} contatos prontos.`, ok ? 'success' : 'warning');
     progressDone();
 
   } catch (err) {
@@ -724,8 +770,10 @@ function baixarResultadoCsv() {
 
 function baixarBaseTratada() {
   if (!state.baseRemainingRows.length) return;
+  const headers   = Object.keys(state.baseRemainingRows[0]);
+  const cleanRows = state.baseRemainingRows.map(r => { const o = {}; for (const h of headers) o[h] = r[h] ?? ''; return o; });
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.baseRemainingRows, { defval: "" }), state.baseOutputSheetName || "BaseTratada");
+  XLSX.utils.book_append_sheet(wb, _xlsxComColunaTexto(cleanRows, ['cnpj']), state.baseOutputSheetName || "BaseTratada");
   XLSX.writeFile(wb, state.baseOutputFileName || "base tratada.xlsx");
   showToast('Download XLSX iniciado!', 'success', 2500);
 }
@@ -760,172 +808,6 @@ function downloadCsv(rows, filename) {
   document.body.appendChild(a); a.click(); a.remove();
 }
 
-/* ===== FORMATAR PARA DISPARO (CSV) ===== */
-async function formatarParaCSV() {
-  if (!state.csvFormatFile) return;
-  const isCarterizado = $('chkCarterizado').checked;
-  setStatus('statusCsvFormatMsg', 'Lendo planilha...');
-  $('btnFormatarCsv').classList.add('btn-loading');
-  $('btnFormatarCsv').disabled = true;
-  progressStart();
-
-  try {
-    const p = await readExcelFile(state.csvFormatFile);
-    const rows = p.rows;
-    if (!rows.length) throw new Error('Planilha vazia ou sem dados.');
-
-    const formatados = [];
-    const erros      = [];
-    let   nCorrigidos = 0;
-
-    for (let i = 0; i < rows.length; i++) {
-      const row    = rows[i];
-      const linha  = i + 2; // número da linha no arquivo (1=header)
-      const correcoes = [];
-      const problemas = [];
-
-      // Normaliza todas as chaves da linha para minúsculo sem acento
-      const norm = {};
-      for (const k of Object.keys(row)) norm[_chaveNorm(k)] = row[k];
-
-      // Monta linha de saída com colunas FIXAS na ordem correta
-      // (evita __EMPTY, colunas duplicadas e lixo do xlsx)
-      const out = {};
-      out['nome'] = String(norm['nome'] ?? norm['name'] ?? '').trim();
-
-      // ── Telefone ──────────────────────────────────────────
-      const telRaw = String(norm['telefone'] ?? norm['fone'] ?? norm['celular'] ?? norm['whatsapp'] ?? '').trim();
-      const telResult = _formatarTel(telRaw);
-      if (telResult.erro) {
-        problemas.push(`Telefone: ${telResult.erro} (original: "${telRaw}")`);
-      } else {
-        if (telResult.corrigido) correcoes.push(`telefone: "${telRaw}" → "${telResult.valor}"`);
-        out['telefone'] = telResult.valor;
-      }
-
-      // ── CNPJ ─────────────────────────────────────────────
-      const cnpjRaw = String(norm['cnpj'] ?? '').trim();
-      if (cnpjRaw) {
-        const cnpjResult = _formatarCnpj(cnpjRaw);
-        if (cnpjResult.erro) {
-          problemas.push(`CNPJ: ${cnpjResult.erro} (original: "${cnpjRaw}")`);
-        } else {
-          if (cnpjResult.corrigido) correcoes.push(`cnpj: "${cnpjRaw}" → "${cnpjResult.valor}"`);
-          out['cnpj'] = cnpjResult.valor;
-        }
-      } else {
-        out['cnpj'] = '';
-      }
-
-      // ── Responsavel (carterizado) ─────────────────────────
-      if (isCarterizado) {
-        const resp = String(norm['responsavel'] ?? norm['responsável'] ?? '').trim();
-        if (!resp) problemas.push('responsavel: campo vazio (obrigatório no modo carterizado)');
-        else out['responsavel'] = resp;
-      }
-
-      if (problemas.length) {
-        erros.push({
-          _linha: linha,
-          _problema: problemas.join(' | '),
-          ...out,
-        });
-      } else {
-        if (correcoes.length) {
-          nCorrigidos++;
-          out['_correcoes'] = correcoes.join(' | ');
-        }
-        formatados.push(out);
-      }
-    }
-
-    state.csvFormatadoRows  = formatados;
-    state.csvErrosRows      = erros;
-    state.csvFormatOutputFileName = `${removeExtensao(state.csvFormatFile.name)}_formatada.csv`;
-
-    const total    = rows.length;
-    const nErros   = erros.length;
-    const nProntos = formatados.length;
-
-    animateCount($('statCsvTotal'),      total);
-    animateCount($('statCsvResolvidos'), nCorrigidos);
-    animateCount($('statCsvErros'),      nErros);
-    animateCount($('statCsvProntos'),    nProntos);
-
-    $('csvErrosCount').textContent     = `${nErros} registros`;
-    $('csvFormatadosCount').textContent = `${nProntos} registros`;
-    $('gridCsvFormat').style.display   = '';
-
-    // Aviso de revisão
-    const aviso = $('avisoRevisao');
-    if (nErros > 0) {
-      aviso.classList.remove('hidden', 'aviso-erro');
-      aviso.classList.add('aviso-erro');
-      $('avisoRevisaoMsg').textContent =
-        `⚠ ${nErros} registro(s) com problemas não resolvidos foram separados. ` +
-        `Corrija-os manualmente antes do envio.`;
-    } else if (nCorrigidos > 0) {
-      aviso.classList.remove('hidden', 'aviso-erro');
-      $('avisoRevisaoMsg').textContent =
-        `${nCorrigidos} registro(s) foram corrigidos automaticamente (coluna _correcoes). ` +
-        `Revise antes do envio para garantir que tudo está dentro do padrão.`;
-    } else {
-      aviso.classList.add('hidden');
-    }
-
-    renderTabela('csvErrosTable',     erros);
-    renderTabela('csvFormatadosTable', formatados);
-
-    $('metaCsvFormatInfo').textContent =
-      `Saída: ${state.csvFormatOutputFileName} · ${nProntos} prontos · ${nCorrigidos} corrigidos · ${nErros} com erro`;
-
-    const ok = nErros === 0;
-    setStatus('statusCsvFormatMsg',
-      ok ? `Formatação concluída! ${nProntos} registros prontos para envio.`
-         : `Formatação concluída com ${nErros} erro(s). Revise os dados apontados.`,
-      ok ? 'success' : 'error');
-
-    $('btnDownloadCsvFormatado').disabled  = (nProntos === 0);
-    $('btnDownloadXlsxFormatado').disabled = (nProntos === 0);
-    showToast(
-      ok ? `CSV formatado! ${nProntos} registros prontos.`
-         : `${nErros} erro(s) não resolvido(s). Verifique a tabela.`,
-      ok ? 'success' : 'error');
-    progressDone();
-
-  } catch (err) {
-    setStatus('statusCsvFormatMsg', `Erro: ${err.message || err}`, 'error');
-    showToast(`Erro: ${err.message || err}`, 'error', 6000);
-    progressDone();
-  } finally {
-    $('btnFormatarCsv').classList.remove('btn-loading');
-    $('btnFormatarCsv').disabled = !state.csvFormatFile;
-  }
-}
-
-function baixarXlsxFormatado() {
-  if (!state.csvFormatadoRows.length) return;
-
-  // Deriva cabeçalhos APENAS da primeira linha (que é construída com colunas fixas)
-  // e cria cópias limpas de cada linha com exatamente essas chaves.
-  // Isso impede que json_to_sheet adicione __EMPTY ou colunas extras do arquivo original.
-  const headers   = Object.keys(state.csvFormatadoRows[0]);
-  const cleanRows = state.csvFormatadoRows.map(row => {
-    const clean = {};
-    for (const h of headers) clean[h] = row[h] ?? '';
-    return clean;
-  });
-
-  const wb  = XLSX.utils.book_new();
-  const ws  = _xlsxComColunaTexto(cleanRows, ['cnpj']);
-  const aba = 'Formatado';
-  XLSX.utils.book_append_sheet(wb, ws, aba);
-  const filename = state.csvFormatOutputFileName
-    ? state.csvFormatOutputFileName.replace('.csv', '.xlsx')
-    : 'base_formatada.xlsx';
-  XLSX.writeFile(wb, filename);
-  showToast('Download XLSX iniciado!', 'success', 2500);
-}
 
 /**
  * Cria worksheet com colunas específicas forçadas como tipo texto (string).
