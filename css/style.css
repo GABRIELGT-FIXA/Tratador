@@ -1266,11 +1266,16 @@ body.light .toast          { background: rgba(255,255,255,0.92); }
 
 /* ===== INTRO ROCKET OVERLAY ===== */
 #rocketIntro {
+  display: none;
   position: fixed;
   inset: 0;
   z-index: 9999;
   background: var(--bg);
   pointer-events: none;
+}
+
+#rocketIntro.intro-active {
+  display: block;
   animation: introFadeOut 0.8s ease 3.8s forwards;
 }
 
@@ -1283,13 +1288,14 @@ body.light .toast          { background: rgba(255,255,255,0.92); }
   transform: rotate(45deg);
   filter: drop-shadow(0 0 22px rgba(56,120,255,0.95)) drop-shadow(0 0 8px #00e5ff);
   opacity: 0;
+}
+
+#rocketIntro.intro-active #rocketIntroSvg {
   animation: rocketFly 3.6s cubic-bezier(0.15, 0.5, 0.35, 1) 0.4s forwards;
 }
 
 #rocketIntroSvg svg { fill: url(#rocketGrad); display: block; }
 
-/* rotate(45deg) estático mantém o foguete inclinado/apontando pra direita.
-   Animação só move left: esquerda → direita */
 @keyframes rocketFly {
   0%   { left: -100px; opacity: 0; }
   6%   { left: 5vw;    opacity: 1; }

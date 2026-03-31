@@ -4,12 +4,21 @@
    ======================================================== */
 
 /* ===== INTRO ROCKET ===== */
-(function () {
+window.comecar = function () {
   const intro = document.getElementById('rocketIntro');
-  if (!intro) return;
-  // Remove do DOM depois que a animação de fade-out termina (0.4+3.6+0.8 ≈ 4.8s)
+  if (!intro) { switchTab('tratamento'); return; }
+
+  // Mostra o overlay e dispara animações via classe
+  intro.style.display = 'block';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    intro.classList.add('intro-active');
+  }));
+
+  // Troca para Tratamento quando o fade-out começa (~3.8s)
+  setTimeout(() => switchTab('tratamento'), 3800);
+  // Remove do DOM depois que tudo termina
   setTimeout(() => intro.remove(), 5000);
-})();
+};
 
 /* ===== PARTICLES ===== */
 (function () {
