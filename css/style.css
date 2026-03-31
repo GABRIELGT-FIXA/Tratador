@@ -1276,10 +1276,11 @@ body.light .toast          { background: rgba(255,255,255,0.92); }
 
 #rocketIntroSvg {
   position: absolute;
-  bottom: -90px;
-  left: -90px;
+  left: -100px;
+  top: calc(50% - 45px);
   width: 90px;
   height: 90px;
+  transform: rotate(45deg);
   filter: drop-shadow(0 0 22px rgba(56,120,255,0.95)) drop-shadow(0 0 8px #00e5ff);
   opacity: 0;
   animation: rocketFly 3.6s cubic-bezier(0.15, 0.5, 0.35, 1) 0.4s forwards;
@@ -1287,12 +1288,12 @@ body.light .toast          { background: rgba(255,255,255,0.92); }
 
 #rocketIntroSvg svg { fill: url(#rocketGrad); display: block; }
 
-/* rotate(45deg): nariz do foguete aponta para cima-direita (direção de viagem)
-   translate(0, -Y): no eixo local -Y com 45deg → move diagonal canto inf-esq → sup-dir */
+/* rotate(45deg) estático mantém o foguete inclinado/apontando pra direita.
+   Animação só move left: esquerda → direita */
 @keyframes rocketFly {
-  0%   { transform: rotate(45deg) translate(0, 0);        opacity: 0; }
-  5%   { transform: rotate(45deg) translate(0, -8vh);     opacity: 1; }
-  100% { transform: rotate(45deg) translate(0, -270vh);   opacity: 1; }
+  0%   { left: -100px; opacity: 0; }
+  6%   { left: 5vw;    opacity: 1; }
+  100% { left: 110vw;  opacity: 1; }
 }
 
 @keyframes introFadeOut {
