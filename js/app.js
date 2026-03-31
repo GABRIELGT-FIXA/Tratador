@@ -205,14 +205,15 @@ $("themeToggle").addEventListener("change", () => {
 
 /* ===== NAV TABS ===== */
 const sectionMap = {
-  comparador: 'sectionComparador',
+  iniciar:    'sectionIniciar',
   tratamento: 'sectionTratamento',
+  comparador: 'sectionComparador',
   vcf:        'sectionVcf',
   editor:     'sectionEditor',
   historico:  'sectionHistorico',
 };
 
-function switchTab(target) {
+window.switchTab = function switchTab(target) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
 
@@ -236,8 +237,8 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
 document.addEventListener('keydown', e => {
   if (e.ctrlKey && !e.shiftKey && !e.altKey) {
     switch (e.key) {
-      case '1': e.preventDefault(); switchTab('comparador'); break;
-      case '2': e.preventDefault(); switchTab('tratamento'); break;
+      case '1': e.preventDefault(); switchTab('tratamento'); break;
+      case '2': e.preventDefault(); switchTab('comparador'); break;
       case '3': e.preventDefault(); switchTab('vcf');        break;
       case '4': e.preventDefault(); switchTab('editor');     break;
       case '5': e.preventDefault(); switchTab('historico');  break;
