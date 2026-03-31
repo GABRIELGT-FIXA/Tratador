@@ -179,6 +179,11 @@ const state = {
   activeListSheetId: "",
   listSheetCounter: 1,
   comparadorChart: null,
+  csvFormatFile: null,
+  csvFormatRows: [],
+  csvFormatadoRows: [],
+  csvErrosRows: [],
+  csvFormatOutputFileName: '',
 };
 
 const $ = id => document.getElementById(id);
@@ -383,6 +388,30 @@ setupDropZone('dropZoneVcf', 'vcfFile', file => {
   ['statVcfTotal', 'statVcfGerados', 'statVcfIgnorados'].forEach(id => $(id).textContent = '0');
 });
 
+/* ===== CSV FORMAT FILE SETUP ===== */
+setupFilePick('btnCsvFormatFile', 'csvFormatFileInput', 'csvFormatFileName', 'dropZoneCsvFormat', file => {
+  state.csvFormatFile = file;
+  Object.assign(state, { csvFormatRows: [], csvFormatadoRows: [], csvErrosRows: [], csvFormatOutputFileName: '' });
+  setStatus('statusCsvFormatMsg', 'Planilha carregada. Clique em Formatar e Analisar.');
+  $('btnFormatarCsv').disabled = false;
+  $('btnDownloadCsvFormatado').disabled = true;
+  ['statCsvTotal','statCsvResolvidos','statCsvErros','statCsvProntos'].forEach(id => $(id).textContent = '0');
+});
+
+setupDropZone('dropZoneCsvFormat', 'csvFormatFileInput', file => {
+  state.csvFormatFile = file;
+  setFileUI('csvFormatFileName', 'dropZoneCsvFormat', file);
+  Object.assign(state, { csvFormatRows: [], csvFormatadoRows: [], csvErrosRows: [], csvFormatOutputFileName: '' });
+  setStatus('statusCsvFormatMsg', 'Planilha carregada. Clique em Formatar e Analisar.');
+  $('btnFormatarCsv').disabled = false;
+  $('btnDownloadCsvFormatado').disabled = true;
+  ['statCsvTotal','statCsvResolvidos','statCsvErros','statCsvProntos'].forEach(id => $(id).textContent = '0');
+});
+
+$('chkCarterizado').addEventListener('change', function () {
+  $('helpCarterizado').style.display = this.checked ? '' : 'none';
+});
+
 /* ===== EDITOR LISTAS ===== */
 $('btnListFiles').addEventListener('click', () => $('listFiles').click());
 $('btnAddMoreLists').addEventListener('click', () => $('listFiles').click());
@@ -467,6 +496,25 @@ $('btnDownloadBaseCsv').addEventListener('click', baixarBaseTratadaCsv);
 $('btnConverterVcf').addEventListener('click', processarConversaoVcf);
 $('btnDownloadVcf').addEventListener('click', baixarVcf);
 $('btnLimparHistorico').addEventListener('click', limparHistorico);
+$('btnFormatarCsv').addEventListener('click', formatarParaCSV);
+$('btnDownloadCsvFormatado').addEventListener('click', () => {
+  if (!state.csvFormatadoRows.length) return;
+  downloadCsv(state.csvFormatadoRows, state.csvFormatOutputFileName || 'base_formatada.csv');
+});
+$('btnClearCsvFormat').addEventListener('click', () => {
+  state.csvFormatFile = null;
+  Object.assign(state, { csvFormatRows: [], csvFormatadoRows: [], csvErrosRows: [], csvFormatOutputFileName: '' });
+  $('csvFormatFileName').textContent = 'nenhum arquivo selecionado';
+  $('csvFormatFileName').classList.add('empty');
+  $('dropZoneCsvFormat').classList.remove('has-file');
+  $('btnFormatarCsv').disabled = true;
+  $('btnDownloadCsvFormatado').disabled = true;
+  $('avisoRevisao').classList.add('hidden');
+  $('gridCsvFormat').style.display = 'none';
+  ['statCsvTotal','statCsvResolvidos','statCsvErros','statCsvProntos'].forEach(id => $(id).textContent = '0');
+  setStatus('statusCsvFormatMsg', 'Selecione uma planilha para formatar.');
+  showToast('Formatador CSV limpo.', 'info', 2000);
+});
 
 /* ===== PROCESSAR COMPARADOR ===== */
 async function processar() {
@@ -704,6 +752,192 @@ function downloadCsv(rows, filename) {
     href: URL.createObjectURL(blob), download: filename
   });
   document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* ===== FORMATAR PARA DISPARO (CSV) ===== */
+async function formatarParaCSV() {
+  if (!state.csvFormatFile) return;
+  const isCarterizado = $('chkCarterizado').checked;
+  setStatus('statusCsvFormatMsg', 'Lendo planilha...');
+  $('btnFormatarCsv').classList.add('btn-loading');
+  $('btnFormatarCsv').disabled = true;
+  progressStart();
+
+  try {
+    const p = await readExcelFile(state.csvFormatFile);
+    const rows = p.rows;
+    if (!rows.length) throw new Error('Planilha vazia ou sem dados.');
+
+    const formatados = [];
+    const erros      = [];
+    let   nCorrigidos = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+      const row    = rows[i];
+      const linha  = i + 2; // número da linha no arquivo (1=header)
+      const correcoes = [];
+      const problemas = [];
+
+      // Normaliza todas as chaves da linha para minúsculo sem acento
+      const norm = {};
+      for (const k of Object.keys(row)) norm[_chaveNorm(k)] = row[k];
+
+      // Monta linha de saída preservando TODAS as colunas normalizadas
+      const out = {};
+      for (const k of Object.keys(norm)) out[k] = norm[k];
+
+      // ── Telefone ──────────────────────────────────────────
+      const telRaw = String(norm['telefone'] ?? norm['fone'] ?? norm['celular'] ?? norm['whatsapp'] ?? '').trim();
+      const telResult = _formatarTel(telRaw);
+      if (telResult.erro) {
+        problemas.push(`Telefone: ${telResult.erro} (original: "${telRaw}")`);
+      } else {
+        if (telResult.corrigido) correcoes.push(`telefone: "${telRaw}" → "${telResult.valor}"`);
+        out['telefone'] = telResult.valor;
+      }
+
+      // ── CNPJ ─────────────────────────────────────────────
+      const cnpjRaw = String(norm['cnpj'] ?? '').trim();
+      if (cnpjRaw) {
+        const cnpjResult = _formatarCnpj(cnpjRaw);
+        if (cnpjResult.erro) {
+          problemas.push(`CNPJ: ${cnpjResult.erro} (original: "${cnpjRaw}")`);
+        } else {
+          if (cnpjResult.corrigido) correcoes.push(`cnpj: "${cnpjRaw}" → "${cnpjResult.valor}"`);
+          out['cnpj'] = cnpjResult.valor;
+        }
+      }
+
+      // ── Responsavel (carterizado) ─────────────────────────
+      if (isCarterizado) {
+        const resp = String(norm['responsavel'] ?? norm['responsável'] ?? norm['responsavel'] ?? '').trim();
+        if (!resp) problemas.push('responsavel: campo vazio (obrigatório no modo carterizado)');
+        else out['responsavel'] = resp;
+      }
+
+      if (problemas.length) {
+        erros.push({
+          _linha: linha,
+          _problema: problemas.join(' | '),
+          ...out,
+        });
+      } else {
+        if (correcoes.length) {
+          nCorrigidos++;
+          out['_correcoes'] = correcoes.join(' | ');
+        }
+        formatados.push(out);
+      }
+    }
+
+    state.csvFormatadoRows  = formatados;
+    state.csvErrosRows      = erros;
+    state.csvFormatOutputFileName = `${removeExtensao(state.csvFormatFile.name)}_formatada.csv`;
+
+    const total    = rows.length;
+    const nErros   = erros.length;
+    const nProntos = formatados.length;
+
+    animateCount($('statCsvTotal'),      total);
+    animateCount($('statCsvResolvidos'), nCorrigidos);
+    animateCount($('statCsvErros'),      nErros);
+    animateCount($('statCsvProntos'),    nProntos);
+
+    $('csvErrosCount').textContent     = `${nErros} registros`;
+    $('csvFormatadosCount').textContent = `${nProntos} registros`;
+    $('gridCsvFormat').style.display   = '';
+
+    // Aviso de revisão
+    const aviso = $('avisoRevisao');
+    if (nErros > 0) {
+      aviso.classList.remove('hidden', 'aviso-erro');
+      aviso.classList.add('aviso-erro');
+      $('avisoRevisaoMsg').textContent =
+        `⚠ ${nErros} registro(s) com problemas não resolvidos foram separados. ` +
+        `Corrija-os manualmente antes do envio.`;
+    } else if (nCorrigidos > 0) {
+      aviso.classList.remove('hidden', 'aviso-erro');
+      $('avisoRevisaoMsg').textContent =
+        `${nCorrigidos} registro(s) foram corrigidos automaticamente (coluna _correcoes). ` +
+        `Revise antes do envio para garantir que tudo está dentro do padrão.`;
+    } else {
+      aviso.classList.add('hidden');
+    }
+
+    renderTabela('csvErrosTable',     erros);
+    renderTabela('csvFormatadosTable', formatados);
+
+    $('metaCsvFormatInfo').textContent =
+      `Saída: ${state.csvFormatOutputFileName} · ${nProntos} prontos · ${nCorrigidos} corrigidos · ${nErros} com erro`;
+
+    const ok = nErros === 0;
+    setStatus('statusCsvFormatMsg',
+      ok ? `Formatação concluída! ${nProntos} registros prontos para envio.`
+         : `Formatação concluída com ${nErros} erro(s). Revise os dados apontados.`,
+      ok ? 'success' : 'error');
+
+    $('btnDownloadCsvFormatado').disabled = (nProntos === 0);
+    showToast(
+      ok ? `CSV formatado! ${nProntos} registros prontos.`
+         : `${nErros} erro(s) não resolvido(s). Verifique a tabela.`,
+      ok ? 'success' : 'error');
+    progressDone();
+
+  } catch (err) {
+    setStatus('statusCsvFormatMsg', `Erro: ${err.message || err}`, 'error');
+    showToast(`Erro: ${err.message || err}`, 'error', 6000);
+    progressDone();
+  } finally {
+    $('btnFormatarCsv').classList.remove('btn-loading');
+    $('btnFormatarCsv').disabled = !state.csvFormatFile;
+  }
+}
+
+/** Normaliza chave de coluna: minúsculo, sem acento, sem espaços extras */
+function _chaveNorm(k) {
+  return String(k)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim().replace(/\s+/g, '_');
+}
+
+/**
+ * Formata telefone para DDI+DDD+número (ex: 5521999999999).
+ * Retorna { valor, corrigido } ou { erro }.
+ */
+function _formatarTel(raw) {
+  const digits = String(raw ?? '').replace(/\D+/g, '');
+  if (!digits) return { erro: 'Telefone vazio' };
+
+  // Já começa com 55 (Brasil)
+  if (digits.startsWith('55')) {
+    if (digits.length === 12 || digits.length === 13) return { valor: digits, corrigido: false };
+    if (digits.length < 12) return { erro: `Número muito curto após DDI 55 (${digits.length} dígitos total)` };
+    return { erro: `Número muito longo (${digits.length} dígitos)` };
+  }
+
+  // 10-11 dígitos sem DDI → adiciona 55
+  if (digits.length === 10 || digits.length === 11) return { valor: `55${digits}`, corrigido: true };
+
+  // Menos de 10 → incompleto
+  if (digits.length < 10) return { erro: `Número incompleto — falta DDD e/ou DDI (${digits.length} dígito(s))` };
+
+  // Outro DDI (não 55) com comprimento razoável (10-15 dígitos) → aceita como está
+  if (digits.length >= 10 && digits.length <= 15) return { valor: digits, corrigido: false };
+
+  return { erro: `Formato não reconhecido (${digits.length} dígitos)` };
+}
+
+/**
+ * Formata CNPJ para 14 dígitos com zero à esquerda.
+ * Retorna { valor, corrigido } ou { erro }.
+ */
+function _formatarCnpj(raw) {
+  const digits = String(raw ?? '').replace(/\D+/g, '');
+  if (!digits) return { valor: '', corrigido: false };
+  if (digits.length > 14) return { erro: `CNPJ com mais de 14 dígitos após remoção de máscara (${digits.length})` };
+  const padded    = digits.padStart(14, '0');
+  const corrigido = padded !== digits;
+  return { valor: padded, corrigido };
 }
 
 /* ===== CHART.JS — COMPARADOR ===== */
