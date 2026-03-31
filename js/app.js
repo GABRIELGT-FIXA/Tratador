@@ -395,6 +395,7 @@ setupFilePick('btnCsvFormatFile', 'csvFormatFileInput', 'csvFormatFileName', 'dr
   setStatus('statusCsvFormatMsg', 'Planilha carregada. Clique em Formatar e Analisar.');
   $('btnFormatarCsv').disabled = false;
   $('btnDownloadCsvFormatado').disabled = true;
+  $('btnDownloadXlsxFormatado').disabled = true;
   ['statCsvTotal','statCsvResolvidos','statCsvErros','statCsvProntos'].forEach(id => $(id).textContent = '0');
 });
 
@@ -405,6 +406,7 @@ setupDropZone('dropZoneCsvFormat', 'csvFormatFileInput', file => {
   setStatus('statusCsvFormatMsg', 'Planilha carregada. Clique em Formatar e Analisar.');
   $('btnFormatarCsv').disabled = false;
   $('btnDownloadCsvFormatado').disabled = true;
+  $('btnDownloadXlsxFormatado').disabled = true;
   ['statCsvTotal','statCsvResolvidos','statCsvErros','statCsvProntos'].forEach(id => $(id).textContent = '0');
 });
 
@@ -500,7 +502,9 @@ $('btnFormatarCsv').addEventListener('click', formatarParaCSV);
 $('btnDownloadCsvFormatado').addEventListener('click', () => {
   if (!state.csvFormatadoRows.length) return;
   downloadCsv(state.csvFormatadoRows, state.csvFormatOutputFileName || 'base_formatada.csv');
+  showToast('Download CSV iniciado!', 'success', 2500);
 });
+$('btnDownloadXlsxFormatado').addEventListener('click', baixarXlsxFormatado);
 $('btnClearCsvFormat').addEventListener('click', () => {
   state.csvFormatFile = null;
   Object.assign(state, { csvFormatRows: [], csvFormatadoRows: [], csvErrosRows: [], csvFormatOutputFileName: '' });
@@ -509,6 +513,7 @@ $('btnClearCsvFormat').addEventListener('click', () => {
   $('dropZoneCsvFormat').classList.remove('has-file');
   $('btnFormatarCsv').disabled = true;
   $('btnDownloadCsvFormatado').disabled = true;
+  $('btnDownloadXlsxFormatado').disabled = true;
   $('avisoRevisao').classList.add('hidden');
   $('gridCsvFormat').style.display = 'none';
   ['statCsvTotal','statCsvResolvidos','statCsvErros','statCsvProntos'].forEach(id => $(id).textContent = '0');
@@ -876,7 +881,8 @@ async function formatarParaCSV() {
          : `Formatação concluída com ${nErros} erro(s). Revise os dados apontados.`,
       ok ? 'success' : 'error');
 
-    $('btnDownloadCsvFormatado').disabled = (nProntos === 0);
+    $('btnDownloadCsvFormatado').disabled  = (nProntos === 0);
+    $('btnDownloadXlsxFormatado').disabled = (nProntos === 0);
     showToast(
       ok ? `CSV formatado! ${nProntos} registros prontos.`
          : `${nErros} erro(s) não resolvido(s). Verifique a tabela.`,
@@ -891,6 +897,53 @@ async function formatarParaCSV() {
     $('btnFormatarCsv').classList.remove('btn-loading');
     $('btnFormatarCsv').disabled = !state.csvFormatFile;
   }
+}
+
+function baixarXlsxFormatado() {
+  if (!state.csvFormatadoRows.length) return;
+  const wb  = XLSX.utils.book_new();
+  const ws  = _xlsxComColunaTexto(state.csvFormatadoRows, ['cnpj']);
+  const aba = 'Formatado';
+  XLSX.utils.book_append_sheet(wb, ws, aba);
+  const filename = state.csvFormatOutputFileName
+    ? state.csvFormatOutputFileName.replace('.csv', '.xlsx')
+    : 'base_formatada.xlsx';
+  XLSX.writeFile(wb, filename);
+  showToast('Download XLSX iniciado!', 'success', 2500);
+}
+
+/**
+ * Cria worksheet com colunas específicas forçadas como tipo texto (string).
+ * Impede notação científica e preserva zeros à esquerda (ex: CNPJ).
+ * @param {object[]} rows
+ * @param {string[]} colsTexto - nomes de coluna (lowercase) que devem ser texto
+ */
+function _xlsxComColunaTexto(rows, colsTexto = []) {
+  const ws    = XLSX.utils.json_to_sheet(rows, { defval: '' });
+  const range = XLSX.utils.decode_range(ws['!ref']);
+
+  // Mapa: índice de coluna → nome do header em minúsculo
+  const colMap = {};
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const cell = ws[XLSX.utils.encode_cell({ r: 0, c })];
+    if (cell && cell.v != null) colMap[c] = String(cell.v).toLowerCase();
+  }
+
+  // Força tipo string nas colunas indicadas (todas as linhas de dados)
+  for (let r = range.s.r + 1; r <= range.e.r; r++) {
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      if (!colsTexto.includes(colMap[c])) continue;
+      const addr = XLSX.utils.encode_cell({ r, c });
+      const cell = ws[addr];
+      if (!cell) continue;
+      cell.t = 's';                      // tipo string
+      cell.z = '@';                      // formato de célula "Texto"
+      cell.v = String(cell.v ?? '');     // valor como string
+      delete cell.w;                     // limpa cache de exibição
+    }
+  }
+
+  return ws;
 }
 
 /** Normaliza chave de coluna: minúsculo, sem acento, sem espaços extras */
