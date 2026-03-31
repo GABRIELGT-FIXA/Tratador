@@ -19,6 +19,29 @@
 </head>
 <body>
 
+  <!-- SVG defs global (gradiente do foguete) -->
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <linearGradient id="rocketGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%"   stop-color="#00e5ff"/>
+        <stop offset="50%"  stop-color="#3878ff"/>
+        <stop offset="100%" stop-color="#3878ff" stop-opacity="0.6"/>
+      </linearGradient>
+    </defs>
+  </svg>
+
+  <!-- Intro Rocket Overlay -->
+  <div id="rocketIntro">
+    <div id="rocketIntroSvg">
+      <div class="svg-wrapper">
+        <svg height="56" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 382.667 382.667">
+          <path d="M375.878.101c-.804-.123-1.621-.123-2.425 0-74.253 14.777-142.571 50.924-196.56 104l-70.56 3.6c-1.987.09-3.87.917-5.28 2.32l-72.48 72.48c-3.137 3.111-3.158 8.177-.047 11.314 1.514 1.526 3.577 2.379 5.727 2.366h.56l81.68-5.6c-3.2 6.72-6.24 13.6-9.04 20.8-1.161 2.95-.471 6.307 1.76 8.56l53.76 53.76c2.253 2.231 5.61 2.921 8.56 1.76 7.44-2.88 14.48-6.08 21.44-9.36l-5.6 82.56c-.254 4.411 3.116 8.193 7.527 8.447 2.256.13 4.463-.701 6.073-2.287l72.48-72.48c1.403-1.41 2.23-3.293 2.32-5.28l3.68-72c52.628-53.906 88.455-121.945 103.12-195.84.67-4.367-2.328-8.45-6.695-9.12zM55.053 178.421l55.2-55.2 51.28-2.64c-13.976 16.377-26.228 34.151-36.56 53.04l-69.92 4.8zm204.96 94.56l-55.2 55.2 4.8-70.88c18.896-10.382 36.671-22.687 53.04-36.72l-2.64 52.4zm-89.44-14.56l-46.32-46.32c58.32-142.48 199.12-184.48 240-193.84-9.2 41.04-50.96 181.76-193.68 240.16z"/>
+          <path d="M88.413 223.221c-3.115-3.159-8.201-3.195-11.36-.08l-74.24 73.92c-3.364 2.865-3.768 7.914-.904 11.278 1.614 1.895 4.018 2.931 6.504 2.802 2.126.012 4.17-.823 5.68-2.32l74.24-74.24c3.159-3.114 3.195-8.201.08-11.36zM90.225 292.557c-.017-.018-.034-.037-.052-.055-3.12-3.102-8.16-3.102-11.28 0l-74.32 74.64c-3.802 2.251-5.058 7.158-2.807 10.96 2.251 3.802 7.158 5.058 10.96 2.807 1.157-.685 2.122-1.65 2.807-2.807l74.24-74.24c3.247-2.998 3.449-8.059.452-11.305zM158.661 294.341c-2.995-2.565-7.412-2.565-10.407 0h.24l-74.24 74.24c-3.356 2.874-3.747 7.924-.873 11.28 2.874 3.356 7.924 3.747 11.28.873.313-.268.605-.56.873-.873l74-74.24c2.873-3.355 2.482-8.406-.873-11.28zM277.599 69.461c-19.617.004-35.517 15.91-35.513 35.527.002 9.42 3.745 18.453 10.407 25.113 6.648 6.683 15.693 10.428 25.12 10.4 19.617-.004 35.517-15.91 35.513-35.527-.004-19.617-15.91-35.517-35.527-35.513zm13.854 49.68c-7.767 7.571-20.153 7.571-27.92 0-7.619-7.622-7.619-19.978 0-27.6v-.32c7.71-7.71 20.21-7.71 27.92 0 7.71 7.71 7.71 20.21 0 27.92z"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
   <!-- Progress Bar (topo) -->
   <div id="progress-bar"></div>
 
@@ -74,33 +97,6 @@
     ==================================================== -->
     <section id="sectionIniciar" class="section active">
       <div class="card splash-card">
-        <div class="splash-rocket-track">
-          <div class="splash-rocket" id="splashRocket">
-            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M32 4C32 4 44 16 44 32C44 40 40 48 32 56C24 48 20 40 20 32C20 16 32 4 32 4Z" fill="url(#rg1)"/>
-              <path d="M20 32C20 32 12 36 10 44L20 42L22 52C28 48 32 44 32 44" fill="url(#rg2)"/>
-              <path d="M44 32C44 32 52 36 54 44L44 42L42 52C36 48 32 44 32 44" fill="url(#rg2)"/>
-              <circle cx="32" cy="28" r="5" fill="#e8f0ff" opacity=".9"/>
-              <ellipse cx="32" cy="52" rx="5" ry="8" fill="url(#rg3)" opacity=".7"/>
-              <defs>
-                <linearGradient id="rg1" x1="32" y1="4" x2="32" y2="56" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stop-color="#00e5ff"/>
-                  <stop offset="100%" stop-color="#3878ff"/>
-                </linearGradient>
-                <linearGradient id="rg2" x1="10" y1="32" x2="54" y2="54" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stop-color="#3878ff"/>
-                  <stop offset="100%" stop-color="#3878ff" stop-opacity="0.4"/>
-                </linearGradient>
-                <linearGradient id="rg3" x1="32" y1="44" x2="32" y2="60" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stop-color="#ffb84d"/>
-                  <stop offset="100%" stop-color="#ff5070" stop-opacity="0"/>
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-          <div class="splash-trail"></div>
-        </div>
-
         <div class="splash-content">
           <div class="splash-badge">v3.0 · Sistema Ativo</div>
           <h1 class="splash-title">PowerBase</h1>

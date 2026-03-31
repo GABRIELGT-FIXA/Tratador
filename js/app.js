@@ -3,6 +3,14 @@
    Lógica principal + melhorias modernas
    ======================================================== */
 
+/* ===== INTRO ROCKET ===== */
+(function () {
+  const intro = document.getElementById('rocketIntro');
+  if (!intro) return;
+  // Remove do DOM depois que a animação de fade-out termina (0.2+0.4+1.8+0.7 ≈ 3.5s)
+  setTimeout(() => intro.remove(), 3500);
+})();
+
 /* ===== PARTICLES ===== */
 (function () {
   const canvas = document.getElementById('particles-canvas');
