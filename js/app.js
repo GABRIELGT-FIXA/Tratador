@@ -904,8 +904,19 @@ async function formatarParaCSV() {
 
 function baixarXlsxFormatado() {
   if (!state.csvFormatadoRows.length) return;
+
+  // Deriva cabeçalhos APENAS da primeira linha (que é construída com colunas fixas)
+  // e cria cópias limpas de cada linha com exatamente essas chaves.
+  // Isso impede que json_to_sheet adicione __EMPTY ou colunas extras do arquivo original.
+  const headers   = Object.keys(state.csvFormatadoRows[0]);
+  const cleanRows = state.csvFormatadoRows.map(row => {
+    const clean = {};
+    for (const h of headers) clean[h] = row[h] ?? '';
+    return clean;
+  });
+
   const wb  = XLSX.utils.book_new();
-  const ws  = _xlsxComColunaTexto(state.csvFormatadoRows, ['cnpj']);
+  const ws  = _xlsxComColunaTexto(cleanRows, ['cnpj']);
   const aba = 'Formatado';
   XLSX.utils.book_append_sheet(wb, ws, aba);
   const filename = state.csvFormatOutputFileName
@@ -922,16 +933,8 @@ function baixarXlsxFormatado() {
  * @param {string[]} colsTexto - nomes de coluna (lowercase) que devem ser texto
  */
 function _xlsxComColunaTexto(rows, colsTexto = []) {
-  // Coleta todos os cabeçalhos de todas as linhas para não perder colunas
-  // que aparecem só em algumas linhas (ex: responsavel, _correcoes)
-  const allKeys = [];
-  const seen = new Set();
-  for (const row of rows) {
-    for (const k of Object.keys(row)) {
-      if (!seen.has(k)) { seen.add(k); allKeys.push(k); }
-    }
-  }
-  const ws    = XLSX.utils.json_to_sheet(rows, { defval: '', header: allKeys });
+  // Rows já chegam limpos (só as colunas desejadas) — json_to_sheet não adiciona extras
+  const ws    = XLSX.utils.json_to_sheet(rows, { defval: '' });
   const range = XLSX.utils.decode_range(ws['!ref']);
 
   // Mapa: índice de coluna → nome do header em minúsculo
